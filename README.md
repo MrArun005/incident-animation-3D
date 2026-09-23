@@ -13,7 +13,8 @@ is generated in code; there are no external assets.
 
 ## Videos
 
-- [`videos/flight-1549.mp4`](videos/flight-1549.mp4): Flight 1549, the 3D reconstruction (100 s, 720p)
+- [`videos/flight-1549-narrated.mp4`](videos/flight-1549-narrated.mp4): Flight 1549, the 3D reconstruction, narrated by Clawd (100 s, 720p)
+- [`videos/flight-1549.mp4`](videos/flight-1549.mp4): the same film without narration
 - [`videos/flight-1549-explained.mp4`](videos/flight-1549-explained.mp4): Spark explains why everyone survived (82 s)
 - [`videos/whiteboard-1549.mp4`](videos/whiteboard-1549.mp4): Whiteboard story #1, Flight 1549 (84 s)
-- [`videos/whiteboard-pythagoras.mp4`](videos/whiteboard-pythagoras.mp4): Whiteboard story #2, Pythagoras proved with four triangles, narrated (64 s)
+- [`videos/whiteboard-pythagoras.mp4`](videos/whiteboard-pythagoras.mp4): Clawd's Whiteboard #2, Pythagoras proved with four triangles, narrated by Clawd (66 s)
