@@ -21,6 +21,11 @@ Notes for any Claude session working in this repo. Owner: Arun (MrArun005).
 - **Cartoons** (`cartoons/`): a separate category. They are stories, not
   lessons. Do NOT put Clawd in cartoons: no Clawd on screen, no "Hi, I'm
   Clawd", no teacher voice. Let the characters and the action tell it.
+- **Direction (2026-09-23): cartoons over photoreal.** Arun rated the
+  photoreal "Before Us" short "okish" and wants more cartoons with engaging
+  scripts instead. Default to cartoon; the script is the priority: a hook in
+  the first 2 s, one character with a clear goal, escalating failures, a
+  twist, a payoff gag.
 
 ## How the videos are made
 
