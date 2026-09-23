@@ -15,6 +15,13 @@ Notes for any Claude session working in this repo. Owner: Arun (MrArun005).
 - Spark (the orange loading-spark mascot) is the host of the 3D explainer
   `flight-1549/lesson.html`, not the teacher.
 
+## Categories: teaching vs cartoons
+
+- **Teaching** (whiteboard stories, explainers): Clawd teaches and narrates.
+- **Cartoons** (`cartoons/`): a separate category. They are stories, not
+  lessons. Do NOT put Clawd in cartoons: no Clawd on screen, no "Hi, I'm
+  Clawd", no teacher voice. Let the characters and the action tell it.
+
 ## How the videos are made
 
 - No external assets: every model, texture and sound effect is generated in
