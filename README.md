@@ -7,10 +7,13 @@ is generated in code; there are no external assets.
 |---|---|
 | US Airways Flight 1549, the "Miracle on the Hudson" (15 January 2009) | [`flight-1549/`](flight-1549/) |
 | Whiteboard story #1: Flight 1549, how an airliner became a glider, narrated by a pixel critter | [`whiteboard/`](whiteboard/) |
+| Whiteboard story #2: the Pythagorean theorem, proved visually, with voice-over | [`whiteboard/`](whiteboard/) |
 | An orange "thinking" spark emoji (looping transparent GIF, 128/256/512 px) | [`spark-emoji/`](spark-emoji/) |
 | The orange pixel critter running (emoji GIFs: in place 128/512 px, and back-and-forth) | [`critter-emoji/`](critter-emoji/) |
 
 ## Videos
 
 - [`videos/flight-1549.mp4`](videos/flight-1549.mp4): Flight 1549, the 3D reconstruction (100 s, 720p)
+- [`videos/flight-1549-explained.mp4`](videos/flight-1549-explained.mp4): Spark explains why everyone survived (82 s)
 - [`videos/whiteboard-1549.mp4`](videos/whiteboard-1549.mp4): Whiteboard story #1, Flight 1549 (84 s)
+- [`videos/whiteboard-pythagoras.mp4`](videos/whiteboard-pythagoras.mp4): Whiteboard story #2, Pythagoras proved with four triangles, narrated (64 s)
