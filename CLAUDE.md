@@ -2,6 +2,10 @@
 
 Notes for any Claude session working in this repo. Owner: Arun (MrArun005).
 
+**This repo is the one home for the animation work.** Build, render, commit and
+push here (`main`). Do not mirror work into MrArun005/3D_Game (the game repo);
+older copies there under `animation/` are stale.
+
 ## Clawd is the teacher
 
 - **Clawd** is the teacher and narrator of every teaching video here: the
