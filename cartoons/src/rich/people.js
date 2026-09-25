@@ -66,8 +66,9 @@ export function person(g, x, y, L, pose = {}, dir = 1, s = 1, t = 0) {
   };
   const hand = (arm, col, big = 1) => { const [, , h] = arm; g.beginPath(); g.arc(h[0], h[1], L.limb * 0.52 * big, 0, TAU); blob(g, col, 2.5); };
   // Back limbs, a shade darker.
-  limbPath(g, ll, L.limb * 1.05, skinD); foot(ll, skinD);
-  limbPath(g, la, L.limb * 0.85, skinD); hand(la, skinD);
+  const legC = L.legsCol || L.skin, armC = L.sleeves || L.skin, shoe = L.shoes || null;
+  limbPath(g, ll, L.limb * 1.05, shade(legC, -0.2)); foot(ll, shoe ? shade(shoe, -0.2) : skinD);
+  limbPath(g, la, L.limb * 0.85, shade(armC, -0.2)); hand(la, skinD);
   if (L.bangles) { for (let i = 0; i < L.bangles; i++) { const k = 0.35 + i * 0.09, bx = lerp(la[1][0], la[2][0], k), by = lerp(la[1][1], la[2][1], k); g.strokeStyle = '#f5efe2'; g.lineWidth = 3.2; g.beginPath(); g.ellipse(bx, by, L.limb * 0.62, 2.4, Math.atan2(la[2][1] - la[1][1], la[2][0] - la[1][0]) + Math.PI / 2, 0, TAU); g.stroke(); } }
   // Braid behind the head swings with the body.
   const hr = (P.head || 0) + lean * 0.5;
@@ -107,6 +108,8 @@ export function person(g, x, y, L, pose = {}, dir = 1, s = 1, t = 0) {
   g.quadraticCurveTo(0, -L.torso - 6, tw, -L.torso + 6); g.quadraticCurveTo(bw + 6 + (L.belly || 0) * 10, -L.torso * 0.45, bw, -4); g.closePath();
   blob(g, L.top || L.skin, 3);
   if (L.top) { g.strokeStyle = L.topTrim || shade(L.top, -0.3); g.lineWidth = 3; g.beginPath(); g.arc(4, -L.torso + 4, 8, 0.2, Math.PI - 0.2); g.stroke(); }
+  if (L.buttons) { g.fillStyle = L.buttons; for (let i = 0; i < 5; i++) { g.beginPath(); g.arc(8, -L.torso + 14 + i * (L.torso - 20) / 5, 2.6, 0, TAU); g.fill(); } g.strokeStyle = rgba(OL, 0.4); g.lineWidth = 2; g.beginPath(); g.moveTo(10, -L.torso + 8); g.lineTo(12, -6); g.stroke(); }
+  if (L.ruff) { for (let i = 0; i < 7; i++) { g.beginPath(); g.arc(-10 + i * 5, -L.torso + 2, 5, 0, TAU); blob(g, '#f4f0e6', 1.5); } }
   else { g.strokeStyle = rgba(OL, 0.3); g.lineWidth = 2; g.beginPath(); g.arc(tw * 0.3, -L.torso * 0.62, 6, 0.3, 1.8); g.stroke(); }
   // Shading on the back half of the torso.
   g.save(); g.clip(); g.fillStyle = 'rgba(40,20,10,0.16)'; g.fillRect(-bw - 10, -L.torso - 10, bw * 0.9, L.torso + 20); g.restore();
@@ -127,11 +130,11 @@ export function person(g, x, y, L, pose = {}, dir = 1, s = 1, t = 0) {
   if (L.necklace) { for (let i = 0; i < 7; i++) { const a = 0.35 + i * 0.4; g.fillStyle = L.necklace; g.beginPath(); g.arc(4 + Math.cos(a) * 10, -L.torso + 4 + Math.sin(a) * 7, 2.6, 0, TAU); g.fill(); } }
   g.restore();
   // Front leg.
-  limbPath(g, rl, L.limb * 1.05, L.skin); foot(rl, L.skin);
+  limbPath(g, rl, L.limb * 1.05, legC); foot(rl, shoe || L.skin);
   // Head.
   head(g, hc, hr, L, P, t);
   // Front arm, with an armband.
-  limbPath(g, ra, L.limb * 0.88, L.skin);
+  limbPath(g, ra, L.limb * 0.88, armC);
   if (L.armband) { const [o, e] = ra, bx = lerp(o[0], e[0], 0.35), by = lerp(o[1], e[1], 0.35); g.strokeStyle = L.armband; g.lineWidth = 4; g.beginPath(); g.ellipse(bx, by, L.limb * 0.6, 3, Math.atan2(e[1] - o[1], e[0] - o[0]) + Math.PI / 2, 0, TAU); g.stroke(); }
   hand(ra, L.skin);
   g.restore();
@@ -165,6 +168,21 @@ function head(g, hc, rot, L, P, t) {
     g.strokeStyle = rgba(OL, 0.3); g.lineWidth = 2.5; for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(-R * 1.0, -R * 0.1 - i * R * 0.32); g.quadraticCurveTo(0, -R * 0.55 - i * R * 0.3, R * 0.95, -R * 0.3 - i * R * 0.28); g.stroke(); }
     g.beginPath(); g.arc(R * 0.55, -R * 0.62, R * 0.12, 0, TAU); blob(g, '#e7c35a', 1.5);
   }
+  if (L.hat) {
+    g.beginPath(); g.ellipse(0, -R * 0.62, R * 1.55, R * 0.28, -0.05, 0, TAU); blob(g, L.hat, 3);
+    g.beginPath(); g.moveTo(-R * 0.72, -R * 0.66); g.quadraticCurveTo(-R * 0.8, -R * 1.55, 0, -R * 1.6); g.quadraticCurveTo(R * 0.8, -R * 1.55, R * 0.72, -R * 0.7); g.closePath(); blob(g, L.hat, 3);
+    g.fillStyle = L.hatBand || '#8a2a20'; g.fillRect(-R * 0.74, -R * 0.95, R * 1.48, R * 0.2);
+    if (L.feather) { g.strokeStyle = L.feather; g.lineWidth = R * 0.14; g.lineCap = 'round'; g.beginPath(); g.moveTo(R * 0.4, -R * 1.0); g.quadraticCurveTo(R * 1.4, -R * 1.9, R * 0.4, -R * 2.2); g.stroke(); }
+  }
+  if (L.kulavi) {
+    // Krishnadevaraya's tall brocade cap.
+    g.beginPath(); g.moveTo(-R * 0.95, -R * 0.3); g.quadraticCurveTo(-R * 0.9, -R * 1.6, -R * 0.25, -R * 2.5); g.quadraticCurveTo(R * 0.3, -R * 2.7, R * 0.6, -R * 2.3); g.quadraticCurveTo(R * 0.9, -R * 1.4, R * 0.95, -R * 0.3); g.quadraticCurveTo(0, -R * 0.55, -R * 0.95, -R * 0.3);
+    const kq = g.createLinearGradient(-R, 0, R, 0); kq.addColorStop(0, shade(L.kulavi, -0.15)); kq.addColorStop(0.5, shade(L.kulavi, 0.15)); kq.addColorStop(1, shade(L.kulavi, -0.2));
+    blob(g, kq, 3);
+    g.fillStyle = '#e2b33a'; for (let i = 0; i < 12; i++) { const yy = -R * (0.6 + (i % 4) * 0.45), xx = -R * 0.5 + Math.floor(i / 4) * R * 0.45 + (i % 2) * R * 0.1; g.beginPath(); g.arc(xx, yy, R * 0.07, 0, TAU); g.fill(); }
+    g.strokeStyle = '#e2b33a'; g.lineWidth = R * 0.12; g.beginPath(); g.moveTo(-R * 0.95, -R * 0.36); g.quadraticCurveTo(0, -R * 0.62, R * 0.95, -R * 0.36); g.stroke();
+  }
+  if (L.flowers) { for (let i = 0; i < 9; i++) { const a = Math.PI * 0.75 + i * 0.13; g.beginPath(); g.arc(Math.cos(a) * R * 1.05 - R * 0.1, Math.sin(a) * R * 1.05 + R * 0.1, R * 0.1, 0, TAU); blob(g, i % 3 ? '#fbf8ee' : '#f2a33a', 1.2); } }
   if (L.crown) {
     // A tall kirita crown: gold bands, a tapering top, jewels.
     g.beginPath(); g.moveTo(-R * 0.95, -R * 0.35); g.lineTo(-R * 0.7, -R * 1.9); g.quadraticCurveTo(0, -R * 2.35, R * 0.7, -R * 1.9); g.lineTo(R * 0.95, -R * 0.35); g.quadraticCurveTo(0, -R * 0.6, -R * 0.95, -R * 0.35);

@@ -1,0 +1,71 @@
+{
+ "duration": 92.0,
+ "lines": [
+  {
+   "id": "rome",
+   "text": "Is this all one city? It is as big as Rome!",
+   "t0": 10.0,
+   "dur": 2.533
+  },
+  {
+   "id": "show",
+   "text": "Even bigger! Come, I'll show you!",
+   "t0": 13.6,
+   "dur": 1.811
+  },
+  {
+   "id": "gems",
+   "text": "Rubies, pearls, diamonds, sold in heaps!",
+   "t0": 20.0,
+   "dur": 2.756
+  },
+  {
+   "id": "believe",
+   "text": "No one in Portugal will believe me.",
+   "t0": 24.4,
+   "dur": 2.042
+  },
+  {
+   "id": "stone",
+   "text": "It's all stone. Even the wheels!",
+   "t0": 33.0,
+   "dur": 2.134
+  },
+  {
+   "id": "bet",
+   "text": "These pillars can sing. Want to bet?",
+   "t0": 41.0,
+   "dur": 2.047
+  },
+  {
+   "id": "cannot",
+   "text": "Stone cannot sing, little one.",
+   "t0": 44.0,
+   "dur": 1.555
+  },
+  {
+   "id": "imposs",
+   "text": "Impossible!",
+   "t0": 50.6,
+   "dur": 0.872
+  },
+  {
+   "id": "king",
+   "text": "Look! That's our king, Krishnadevaraya!",
+   "t0": 59.2,
+   "dur": 2.239
+  },
+  {
+   "id": "perfect",
+   "text": "The most feared and perfect king that could possibly be.",
+   "t0": 64.6,
+   "dur": 2.81
+  },
+  {
+   "id": "garland",
+   "text": "A garland, for me? Thank you, little one.",
+   "t0": 70.4,
+   "dur": 2.432
+  }
+ ]
+}

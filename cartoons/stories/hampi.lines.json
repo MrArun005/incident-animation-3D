@@ -1,0 +1,18 @@
+{
+  "voice": "hf_alpha",
+  "speed": 1.05,
+  "duration": 92.0,
+  "lines": [
+    { "id": "rome",    "at": 10.0, "voice": "em_alex", "speed": 0.95, "text": "Is this all one city? It is as big as Rome!" },
+    { "id": "show",    "at": 13.6, "text": "Even bigger! Come, I'll show you!" },
+    { "id": "gems",    "at": 20.0, "text": "Rubies, pearls, diamonds, sold in heaps!" },
+    { "id": "believe", "at": 24.4, "voice": "em_alex", "speed": 0.95, "text": "No one in Portugal will believe me." },
+    { "id": "stone",   "at": 33.0, "text": "It's all stone. Even the wheels!" },
+    { "id": "bet",     "at": 41.0, "text": "These pillars can sing. Want to bet?" },
+    { "id": "cannot",  "at": 44.0, "voice": "em_alex", "speed": 0.95, "text": "Stone cannot sing, little one." },
+    { "id": "imposs",  "at": 50.6, "voice": "em_alex", "speed": 0.95, "text": "Impossible!" },
+    { "id": "king",    "at": 59.2, "text": "Look! That's our king, Krishnadevaraya!" },
+    { "id": "perfect", "at": 64.6, "voice": "em_alex", "speed": 0.92, "text": "The most feared and perfect king that could possibly be." },
+    { "id": "garland", "at": 70.4, "voice": "hm_psi", "speed": 0.95, "text": "A garland, for me? Thank you, little one." }
+  ]
+}

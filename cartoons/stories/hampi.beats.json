@@ -1,0 +1,11 @@
+{
+  "duration": 92.0,
+  "scenes": [["open", 0], ["gate", 8.0], ["bazaar", 16.2], ["chariot", 29.6], ["pillars", 39.0], ["festival", 54.0], ["garland", 68.2], ["epi", 78.0]],
+  "arrive": 9.6, "kamalaIn": 12.4, "follow": 15.2,
+  "capGems": 21.0, "write": 24.4,
+  "capChariot": 30.4, "touch": 35.5,
+  "taps": [46.0, 46.5, 47.0, 47.5, 48.0], "capPillars": 46.4, "jaw": 49.0, "paesTap": 51.6, "giggle": 52.2,
+  "capFest": 55.0, "kingUp": 57.0, "pen": 64.6,
+  "take": 69.6, "wear": 72.6, "capPoet": 74.2,
+  "cap1": 78.8, "cap2": 81.8, "cap3": 84.8, "endCard": 88.6
+}
