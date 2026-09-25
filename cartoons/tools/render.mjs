@@ -40,20 +40,22 @@ if (opt('stills')) {
   }
   console.log('stills written');
 } else {
-  const video = path.join(OUT, `${NAME}-video.mp4`);
-  const ff = spawn(ffmpeg, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-    '-c:v', 'libx264', '-preset', 'slow', '-crf', '20', '-pix_fmt', 'yuv420p', video], { stdio: ['pipe', 'inherit', 'inherit'] });
+  // --hq: lossless PNG frames and a near-transparent encode (the master); otherwise JPEG frames at crf 20.
+  const HQ = args.includes('--hq'), SUF = HQ ? '-hq' : '';
+  const video = path.join(OUT, `${NAME}${SUF}-video.mp4`);
+  const enc = HQ ? ['-c:v', 'png', '-i', '-', '-c:v', 'libx264', '-preset', 'slow', '-tune', 'animation', '-crf', '12'] : ['-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'slow', '-crf', '20'];
+  const ff = spawn(ffmpeg, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), ...enc, '-pix_fmt', 'yuv420p', video], { stdio: ['pipe', 'inherit', 'inherit'] });
   const N = Math.round(DURATION * FPS);
   for (let i = 0; i < N; i++) {
-    const url = await grab(i, 'image/jpeg');
+    const url = await grab(i, HQ ? 'image/png' : 'image/jpeg');
     if (!ff.stdin.write(Buffer.from(url.split(',')[1], 'base64'))) await new Promise((r) => ff.stdin.once('drain', r));
     if (i % 300 === 0) console.log(`frame ${i}/${N}`);
   }
   ff.stdin.end();
   await new Promise((r) => ff.on('close', r));
-  const wav = path.join(OUT, `${NAME}.wav`), mp4 = path.join(OUT, `${NAME}.mp4`);
+  const wav = path.join(OUT, `${NAME}.wav`), mp4 = path.join(OUT, `${NAME}${SUF}.mp4`);
   if (fs.existsSync(wav)) {
-    spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', video, '-i', wav, '-c:v', 'copy', '-c:a', 'aac', '-b:a', '160k', '-shortest', '-movflags', '+faststart', mp4], { stdio: 'inherit' });
+    spawnSync(ffmpeg, ['-y', '-loglevel', 'error', '-i', video, '-i', wav, '-c:v', 'copy', '-c:a', 'aac', '-b:a', HQ ? '256k' : '160k', '-shortest', '-movflags', '+faststart', mp4], { stdio: 'inherit' });
     console.log(`wrote ${path.relative(ROOT, mp4)}`);
   } else console.log(`wrote ${path.relative(ROOT, video)} (no soundtrack found)`);
 }
