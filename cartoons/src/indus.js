@@ -3,9 +3,9 @@
 // monkey steals it; the chase runs through the real city: grid streets, covered
 // drains, the bead market, the Great Bath. Rich-cartoon engine in src/indus/;
 // every beat time lives in stories/indus.beats.json (the soundtrack reads it too).
-import * as C from './indus/core.js';
+import * as C from './rich/core.js';
 import * as Wd from './indus/world.js';
-import * as Pp from './indus/people.js';
+import * as Pp from './rich/people.js';
 import * as Sl from './indus/seal.js';
 import B from '../stories/indus.beats.json' with { type: 'json' };
 import timing from '../stories/indus.timing.json' with { type: 'json' };
@@ -29,7 +29,7 @@ function fact(g, text, t, t0, dur = 3.0) {
   const k = win(t, t0, t0 + dur, 0.35); if (k <= 0) return;
   g.save(); g.globalAlpha = k;
   g.font = `600 36px ${C.FONT}`;
-  const w = g.measureText(text).width + 90, x = 70, y = H - 150 + (1 - easeOut(clamp((t - t0) / 0.35, 0, 1))) * 30;
+  const w = g.measureText(text).width + 90, x = 60, y = 48 - (1 - easeOut(clamp((t - t0) / 0.35, 0, 1))) * 30;
   g.fillStyle = 'rgba(30,16,8,0.78)'; g.beginPath(); g.roundRect(x, y, w, 76, 16); g.fill();
   g.strokeStyle = 'rgba(231,173,60,0.9)'; g.lineWidth = 2.5; g.stroke();
   g.fillStyle = '#e7ad3c'; g.save(); g.translate(x + 34, y + 38); g.rotate(Math.PI / 4); g.fillRect(-8, -8, 16, 16); g.restore();

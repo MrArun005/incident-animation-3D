@@ -1,6 +1,6 @@
 // The city and the land: 2.5D baked-brick houses (front, lit side and roof), the
 // citadel mound with the Great Bath, trees, reeds, the river and its boats.
-import { W, H, TAU, clamp, lerp, rng, mix, shade, rgba, cached, pattern, brickTile, mudTile, glow, softShadow, cam } from './core.js';
+import { W, H, TAU, clamp, lerp, rng, mix, shade, rgba, cached, pattern, brickTile, mudTile, glow, softShadow, cam } from '../rich/core.js';
 
 // Oblique projection: depth runs up and to the right.
 const OB = [0.62, -0.42];

@@ -1,7 +1,7 @@
 // The unicorn seal. On a real seal the picture is cut into the stone reversed,
 // so the stamp in clay reads the right way round: here the seal's unicorn faces
 // left and the impression's faces right. Strokes are in a 100 x 100 box.
-import { TAU, clamp, rgba, rng, shade, glow } from './core.js';
+import { TAU, clamp, rgba, rng, shade, glow } from '../rich/core.js';
 
 const UNICORN = [
   [[20, 40], [35, 37], [55, 38], [68, 36]],                      // back

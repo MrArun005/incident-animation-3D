@@ -1,0 +1,13 @@
+{
+  "duration": 92.0,
+  "scenes": [["open", 0], ["temple", 8.6], ["dive", 17.6], ["harsha", 19.6], ["map", 26.4], ["narmada", 30.4], ["battle", 40.0], ["joy", 56.2], ["laugh", 61.4], ["lord", 66.0], ["china", 70.8], ["name", 77.4], ["epi", 84.2]],
+  "glowUp": 16.9, "flash": 19.3,
+  "mapNorth": 26.5, "mapArrow": 27.2, "mapSouth": 28.6, "mapRiver": 29.2,
+  "capRiver": 31.0, "pushIn": 34.2,
+  "drums": 40.2, "charge": 41.0, "falls": [46.4, 47.7, 48.9], "retreat": 50.4, "harshaFace": 52.2,
+  "melt": 58.0,
+  "crown": 66.6, "capLord": 67.3,
+  "capChina": 71.4, "write": 74.6,
+  "eyeRoll": 83.0, "bothLaugh": 83.8,
+  "cap1": 84.8, "cap2": 87.4, "endCard": 89.6
+}

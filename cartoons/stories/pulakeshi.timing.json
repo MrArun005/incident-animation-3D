@@ -1,0 +1,83 @@
+{
+ "duration": 92.0,
+ "lines": [
+  {
+   "id": "ask",
+   "text": "Guruji, tell me the battle story again!",
+   "t0": 9.2,
+   "dur": 2.288
+  },
+  {
+   "id": "listen",
+   "text": "Then listen, Ganga, and carve every word. It is the story of our king, Pulakeshin.",
+   "t0": 11.8,
+   "dur": 5.809
+  },
+  {
+   "id": "harsha",
+   "text": "In the north ruled Harsha, the mightiest emperor of his time, with a sea of war elephants.",
+   "t0": 19.8,
+   "dur": 6.084
+  },
+  {
+   "id": "south",
+   "text": "And he wanted the south as well.",
+   "t0": 26.6,
+   "dur": 1.966
+  },
+  {
+   "id": "waiting",
+   "text": "But at the Narmada river, a young king was waiting.",
+   "t0": 30.6,
+   "dur": 3.331
+  },
+  {
+   "id": "nostep",
+   "text": "Not one step further!",
+   "t0": 35.0,
+   "dur": 1.521
+  },
+  {
+   "id": "charge",
+   "text": "Harsha's elephants charged into the river, and one by one, they fell.",
+   "t0": 44.6,
+   "dur": 4.376
+  },
+  {
+   "id": "joy",
+   "text": "And when Harsha saw his elephants fall, his harsha melted away.",
+   "t0": 56.4,
+   "dur": 4.353
+  },
+  {
+   "id": "laugh",
+   "text": "Harsha means joy! He lost his joy!",
+   "t0": 61.6,
+   "dur": 2.101
+  },
+  {
+   "id": "lord",
+   "text": "From that day, Pulakeshin was called the Lord of the South.",
+   "t0": 66.2,
+   "dur": 3.574
+  },
+  {
+   "id": "china",
+   "text": "Even a traveller from China, Xuanzang, wrote that Harsha could never defeat his soldiers.",
+   "t0": 71.0,
+   "dur": 6.005
+  },
+  {
+   "id": "name",
+   "text": "Now carve my name at the end. Ravikirti, as famous as Kalidasa.",
+   "t0": 77.6,
+   "dur": 4.944
+  },
+  {
+   "id": "guruji",
+   "text": "Guruji!",
+   "t0": 83.0,
+   "dur": 0.835
+  }
+ ]
+}
