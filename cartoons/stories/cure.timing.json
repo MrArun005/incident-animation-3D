@@ -1,0 +1,53 @@
+{
+ "duration": 84.0,
+ "lines": [
+  {
+   "id": "cell",
+   "text": "Every cancer begins with one cell that stops listening, and keeps on dividing.",
+   "t0": 2.0,
+   "dur": 4.51
+  },
+  {
+   "id": "slow",
+   "text": "Fighting it is slow. One idea, one experiment, one answer at a time. A new medicine can take more than ten years.",
+   "t0": 11.5,
+   "dur": 7.217
+  },
+  {
+   "id": "essay",
+   "text": "In 2024, Anthropic's Dario Amodei wrote an essay asking: what if AI could do science alongside us?",
+   "t0": 23.5,
+   "dur": 7.636
+  },
+  {
+   "id": "country",
+   "text": "Not one mind, but a country of geniuses in a datacenter, testing thousands of ideas at once.",
+   "t0": 32.0,
+   "dur": 5.912
+  },
+  {
+   "id": "search",
+   "text": "Searching for molecules that fit exactly where cancer is weak.",
+   "t0": 42.0,
+   "dur": 3.42
+  },
+  {
+   "id": "immune",
+   "text": "Teaching the body's own immune cells to see what they had missed.",
+   "t0": 48.5,
+   "dur": 3.302
+  },
+  {
+   "id": "century",
+   "text": "He called it the compressed twenty-first century: a hundred years of progress, in perhaps ten.",
+   "t0": 57.0,
+   "dur": 5.134
+  },
+  {
+   "id": "promise",
+   "text": "It is a possibility, not a promise. And if it comes, it will be because scientists, doctors and patients kept going.",
+   "t0": 68.0,
+   "dur": 6.738
+  }
+ ]
+}
