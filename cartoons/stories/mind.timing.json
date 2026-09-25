@@ -1,0 +1,53 @@
+{
+ "duration": 90.0,
+ "lines": [
+  {
+   "id": "tokens",
+   "text": "Before a model can read your words, it cuts them into pieces, called tokens.",
+   "t0": 6.0,
+   "dur": 4.354
+  },
+  {
+   "id": "space",
+   "text": "Each token becomes a point in a vast space of meaning, where related words live close together.",
+   "t0": 16.0,
+   "dur": 5.275
+  },
+  {
+   "id": "attend",
+   "text": "Then every word looks at every other word, and decides what matters. This is called attention.",
+   "t0": 28.5,
+   "dur": 5.195
+  },
+  {
+   "id": "layers",
+   "text": "Layer after layer, the picture sharpens. Not just an ocean, but the ocean, at night.",
+   "t0": 42.0,
+   "dur": 4.842
+  },
+  {
+   "id": "probs",
+   "text": "At the very end, there is no single answer. Only probabilities.",
+   "t0": 53.5,
+   "dur": 3.928
+  },
+  {
+   "id": "again",
+   "text": "It picks a word, adds it to the sentence, and starts again.",
+   "t0": 59.6,
+   "dur": 3.097
+  },
+  {
+   "id": "answer",
+   "text": "Dark, quiet, and full of light.",
+   "t0": 71.2,
+   "dur": 1.944
+  },
+  {
+   "id": "shapes",
+   "text": "It does not think in words. It thinks in shapes of meaning. And then, one word at a time, it speaks.",
+   "t0": 76.8,
+   "dur": 5.629
+  }
+ ]
+}
