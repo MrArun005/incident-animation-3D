@@ -26,6 +26,11 @@ Notes for any Claude session working in this repo. Owner: Arun (MrArun005).
   scripts instead. Default to cartoon; the script is the priority: a hook in
   the first 2 s, one character with a clear goal, escalating failures, a
   twist, a payoff gag.
+- **"As rich as possible" (2026-09-25, The Unicorn Seal):** Arun asked for the
+  richest animation quality. The rich engine is `cartoons/src/indus/` (1080p,
+  parallax layers, brick/mud textures, haze, god rays, depth-of-field blur,
+  outlined clothed rig with 3/4 faces, colour grade). Reuse it for new rich
+  cartoons instead of the flat kit. Wide 16:9 when a story needs big vistas.
 
 ## How the videos are made
 
