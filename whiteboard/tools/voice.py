@@ -42,7 +42,7 @@ def radio(x):
 
 t, chunks, timing = 0.0, [], []
 for line in spec['lines']:
-    samples, sr = k.create(line['text'], voice=line.get('voice', spec['voice']), speed=line.get('speed', spec['speed']), lang='en-us')
+    samples, sr = k.create(line.get('say', line['text']), voice=line.get('voice', spec['voice']), speed=line.get('speed', spec['speed']), lang='en-us')
     a = np.abs(samples); idx = np.where(a > 0.01)[0]
     samples = samples[max(0, idx[0] - 240): idx[-1] + 2400] if len(idx) else samples
     if line.get('fx') == 'radio':

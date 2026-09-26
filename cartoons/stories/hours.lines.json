@@ -1,0 +1,119 @@
+{
+ "voice": "af_heart",
+ "speed": 0.92,
+ "lines": [
+  {
+   "id": "a1",
+   "at": 2.4,
+   "text": "Six forty-five. The alarm screams."
+  },
+  {
+   "id": "a2",
+   "gap": 0.7,
+   "text": "We own more time-saving machines than anyone who has ever lived, and somehow, we have less time than almost any of them."
+  },
+  {
+   "id": "a3",
+   "gap": 1.4,
+   "text": "Fifty thousand years ago, a woman woke when the light did. No clock. No schedule. Just the day, and what she wanted to do with it."
+  },
+  {
+   "id": "b1",
+   "gap": 1.6,
+   "text": "Archaeologists can read a life in bones. So let's meet two people."
+  },
+  {
+   "id": "b2",
+   "gap": 0.7,
+   "text": "On the left, a forager, from before farming. Tall. Strong, clean bones. Teeth worn down, but healthy, from a diet of hundreds of different plants and animals."
+  },
+  {
+   "id": "b3",
+   "gap": 0.8,
+   "text": "On the right, one of the first farmers, a few thousand years later. In many regions, people like this were several centimetres shorter. Their teeth show cavities from starchy grain, and their joints show arthritis."
+  },
+  {
+   "id": "b4",
+   "gap": 0.8,
+   "text": "At Abu Hureyra, in Syria, the toes and knees of early farming women were bent out of shape, from kneeling for hours every day at a grinding stone."
+  },
+  {
+   "id": "c1",
+   "gap": 1.6,
+   "text": "So how did foragers spend their days?"
+  },
+  {
+   "id": "c2",
+   "gap": 0.7,
+   "say": "In the nineteen sixties, the anthropologist Richard Lee lived with the Zhu-twasi of the Kalahari, and he counted.",
+   "text": "In the 1960s, the anthropologist Richard Lee lived with the Ju/'hoansi of the Kalahari, and he counted."
+  },
+  {
+   "id": "c3",
+   "gap": 0.7,
+   "text": "Finding food took about fifteen to twenty hours a week. Add in making tools and daily chores, and it comes to around forty. But we have chores too, on top of our working week. And much of their work was done together: walking, talking, sharing."
+  },
+  {
+   "id": "d1",
+   "gap": 1.6,
+   "text": "And the rest of the time? They made things that had no use at all, except meaning."
+  },
+  {
+   "id": "d2",
+   "gap": 0.7,
+   "text": "Shell beads, pierced and strung, seventy thousand years ago. Flutes carved from bird bone, forty thousand years ago."
+  },
+  {
+   "id": "d3",
+   "gap": 0.8,
+   "text": "Friendship was their bank, their doctor, and their pension. Share your meat today, and someone shares theirs, the day your hunt fails."
+  },
+  {
+   "id": "d4",
+   "gap": 0.8,
+   "say": "The anthropologist Polly Weesner listened to Zhu-twasi conversations, by day and by night. By day, people talked about land, food, and complaints.",
+   "text": "The anthropologist Polly Wiessner listened to Ju/'hoansi conversations, by day and by night. By day, people talked about land, food, and complaints."
+  },
+  {
+   "id": "d5",
+   "gap": 0.7,
+   "text": "But around the fire at night, most of the talk was stories. In that firelight, culture was born."
+  },
+  {
+   "id": "e1",
+   "gap": 1.8,
+   "text": "Then, around eleven thousand years ago, in the Fertile Crescent, people began to plant wheat and barley."
+  },
+  {
+   "id": "e2",
+   "gap": 0.7,
+   "text": "Farming fed more mouths. So there were more mouths to feed."
+  },
+  {
+   "id": "e3",
+   "gap": 0.7,
+   "text": "Fields had to be sown, weeded, watered, harvested, and guarded, every single year. You could not walk away from a field."
+  },
+  {
+   "id": "e4",
+   "gap": 0.8,
+   "text": "The people held on to the harvest. And the harvest held on to the people."
+  },
+  {
+   "id": "f1",
+   "gap": 1.8,
+   "text": "We are the descendants of those farmers. We trade our hours for security, and we dream of the day we'll have time again. Time to walk, to make things, to sit by a fire with friends and tell stories."
+  },
+  {
+   "id": "f2",
+   "gap": 0.9,
+   "text": "Our ancestors did not live in paradise. Life was dangerous, and many children died young."
+  },
+  {
+   "id": "f3",
+   "gap": 0.9,
+   "text": "But they knew something we are slowly forgetting. Time was never a thing to be earned. It was always ours."
+  }
+ ],
+ "duration": 194.0
+}
