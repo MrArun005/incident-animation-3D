@@ -73,8 +73,11 @@ server with three.js answered from a local copy, frames stepped at 60 Hz, real k
   close pass, collision, Vega's station-keeping).
 - `vega.mjs` — Vega over a long run of full-stick manoeuvres.
 - `hard.mjs` — the Hard settings: field size, gauntlet clearances, speeds, damage and scoring.
-- `pilot.mjs` — a closed-loop pilot that lines up close passes (`--hard` for Hard); `--record` captures a
+- `pilot.mjs` — the autopilot: a sampling planner that rolls ~200 candidate aims 2.4 s ahead through a copy
+  of the flight model, checks every hull probe against the rocks, and flies the one with the best passes and
+  no contact (on Hard: 53 passes in 80 s, 22 under 1.6 m, no hits). `--hard` for Hard; `--record` captures a
   video, and `record.sh [seconds] [hard]` turns that into the finished cut with sound and an end card.
-  `lab/` holds the scoring harness the pilot was tuned with.
+  `lab/` holds the scoring harness and the four designs that were tried against it (tuned chaser, MPC,
+  sampler, baseline); the sampler won.
 - `audio-flight.mjs` — rebuilds the game's sound offline from a recorded flight's event log.
 The tools use this environment's paths (Chromium, ffmpeg, a local three.js copy); they're dev scripts.

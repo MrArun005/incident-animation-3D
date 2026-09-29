@@ -20,7 +20,7 @@ const FFMPEG = '/home/user/incident-animation-3d/cartoons/node_modules/ffmpeg-st
 
 /* ================================ the ship: probes and flight model ================================ */
 // The 23 collision probes ship with the model (assets/jupiter.json): ship-local +X right, +Y up, -Z forward.
-const SHIP = JSON.parse(fs.readFileSync(new URL('../assets/jupiter.json', import.meta.url), 'utf8'));
+const SHIP = JSON.parse(fs.readFileSync(new URL('../../assets/jupiter.json', import.meta.url), 'utf8'));
 const PX = Float64Array.from(SHIP.samples, (s) => s.p[0]), PY = Float64Array.from(SHIP.samples, (s) => s.p[1]);
 const PZ = Float64Array.from(SHIP.samples, (s) => s.p[2]), PR = Float64Array.from(SHIP.samples, (s) => s.r);
 const NP = PX.length;
@@ -342,15 +342,12 @@ export { step, copyS, ctrl, KEY, rollout, plan, buildPlan, probeGap, ringAt, pas
 
 /* ================================ flying ================================ */
 if (!LIB) {
-  const { open } = await import('./harness.mjs');
+  const { open } = await import('../harness.mjs');
   const g = await open({ width: W, height: H, storage: { 'astra-hard': HARD ? '1' : '0' } });
   const { page, state } = g;
 
-  // Recording writes numbered JPEGs to <record>.frames/ and encodes them at the end. The flight is
-  // deterministic, so a restarted recording replays the frames already on disk without drawing them.
-  const FDIR = RECORD ? RECORD.replace(/\.mp4$/, '') + '.frames' : null;
-  if (FDIR) fs.mkdirSync(FDIR, { recursive: true });
-  let nf = 0;
+  let ff = null;
+  if (RECORD) ff = spawn(FFMPEG, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', '30', '-c:v', 'mjpeg', '-i', '-', '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', RECORD], { stdio: ['pipe', 'inherit', 'inherit'] });
   const frames = [];                                   // per video frame: speed, thrust, boost (for the soundtrack)
   const held = new Set();
   async function keys(want) {                          // press / release so exactly `want` is held
@@ -358,9 +355,8 @@ if (!LIB) {
     for (const k of want) if (!held.has(k)) { await page.keyboard.down(k); held.add(k); }
   }
   async function frame(i) {                            // two 1/60 s steps per 30 fps video frame; draw the second
-    const fp = FDIR && `${FDIR}/f${String(nf++).padStart(5, '0')}.jpg`, need = fp && !fs.existsSync(fp);
-    const s = await page.evaluate((draw) => { window.__astra.step(1 / 60, false); window.__astra.step(1 / 60, draw); return window.__astra.state(); }, !!need);   // a dry run doesn't draw
-    if (need) { const buf = await page.screenshot({ type: 'jpeg', quality: 92 }); fs.writeFileSync(fp + '.tmp', buf); fs.renameSync(fp + '.tmp', fp); }
+    const s = await page.evaluate((draw) => { window.__astra.step(1 / 60, false); window.__astra.step(1 / 60, draw); return window.__astra.state(); }, !!ff);   // a dry run doesn't draw
+    if (ff) { const buf = await page.screenshot({ type: 'jpeg', quality: 92 }); if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once('drain', r)); }
     frames.push({ t: s.t, speed: s.speed, boosting: s.boosting }); return s;
   }
   // One read per frame: the state, every rock within 620 m, and a 72-sample surface ring for each rock the
@@ -428,7 +424,7 @@ if (!LIB) {
   await page.keyboard.press('KeyP'); for (let i = 0; i < 10; i++) await frame(0);
 
   const s = await state(), ev = await page.evaluate(() => window.__astra.events(0));
-  if (FDIR) await new Promise((r, j) => spawn(FFMPEG, ['-y', '-loglevel', 'error', '-framerate', '30', '-i', `${FDIR}/f%05d.jpg`, '-frames:v', String(nf), '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', RECORD], { stdio: 'inherit' }).on('close', (c) => (c ? j(new Error('ffmpeg ' + c)) : r())));
+  if (ff) { ff.stdin.end(); await new Promise((r) => ff.on('close', r)); }
   const out = LOG || (RECORD ? RECORD.replace(/\.mp4$/, '.json') : '/tmp/claude-0/pilot-run.json');
   fs.writeFileSync(out, JSON.stringify({ frames, events: ev, final: s }));
   const rms = Math.sqrt(modelErr.reduce((a, e) => a + e * e, 0) / Math.max(1, modelErr.length));
