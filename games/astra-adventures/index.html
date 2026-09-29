@@ -415,7 +415,7 @@ let assets;
 try {
   const rockInfo = await fileL.loadAsync(A + 'rocks.json');
   const [shipGltf, shipInfo, rocksGltf, skyTex, starInfo, vegaMap, detailTex, ...rockTex] = await Promise.all([
-    gltfL.loadAsync(A + `jupiter${Q.tex}.glb`), fileL.loadAsync(A + 'jupiter.json'), gltfL.loadAsync(A + 'rocks.glb'),
+    gltfL.loadAsync(A + `jupiter${Q.tex}.gltf.json`), fileL.loadAsync(A + 'jupiter.json'), gltfL.loadAsync(A + 'rocks.gltf.json'),
     loadTex(MOBILE ? 'sky-2k.jpg' : 'sky.jpg', true, true, 4), fileL.loadAsync(A + 'stars.json'), loadTex(`jupiter-vega${Q.tex}.jpg`, true), loadTex('rock-detail.jpg', false, false, 8),
     ...rockInfo.rocks.flatMap((r) => [loadTex(`rock-${r.name}-albedo${Q.tex}.jpg`, true), loadTex(`rock-${r.name}-normal${Q.tex}.jpg`, false)]),
   ]);
@@ -458,7 +458,7 @@ const VARIANTS = assets.rockInfo.rocks.map((info) => {
   return { name: info.name, maxR: info.rmax, table, geos: [] };
 });
 assets.rocksGltf.scene.traverse((o) => { if (!o.isMesh) return; const m = /^(\w+)_lod(\d)$/.exec(o.name); const V = m && VARIANTS.find((v) => v.name === m[1]); if (V) V.geos[+m[2]] = o.geometry; });
-VARIANTS.forEach((V) => { for (let l = 0; l < 3; l++) if (!V.geos[l]) throw new Error(`rocks.glb has no ${V.name}_lod${l}`); });
+VARIANTS.forEach((V) => { for (let l = 0; l < 3; l++) if (!V.geos[l]) throw new Error(`the rock models have no ${V.name}_lod${l}`); });
 // Distance from the rock centre to its surface along a unit direction (rock-local), in units of the rock's scale.
 function surfR(S, ux, uy, uz) {
   const lat = Math.asin(clamp(uy, -1, 1)); let lon = Math.atan2(uz, ux); if (lon < 0) lon += Math.PI * 2;
@@ -713,7 +713,7 @@ function buildShip(livery) {
     } else if (o.name === 'Glass') { o.material = glassMat; o.renderOrder = 2; }
     else { const c = LAMPS[o.name]; o.material = new T.MeshBasicMaterial({ color: c ? new T.Color(...c) : new T.Color(1, 1, 1), fog: false }); }
   });
-  for (const n of ['Hull', 'Glass', 'GlowC', 'GlowL', 'GlowR', 'Beacon', 'StrobeL', 'StrobeR']) if (!parts[n]) throw new Error(`jupiter.glb has no ${n}`);
+  for (const n of ['Hull', 'Glass', 'GlowC', 'GlowL', 'GlowR', 'Beacon', 'StrobeL', 'StrobeR']) if (!parts[n]) throw new Error(`the ship model has no ${n}`);
   g.add(model);
   const plume = new Plume(L); g.add(plume.mesh);
   const light = new T.PointLight(L.edge.getHex(), 1, 15, 2); light.position.set(0, 0.6, 7.6); g.add(light);

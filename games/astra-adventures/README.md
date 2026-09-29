@@ -30,6 +30,8 @@ numpy/scipy/Pillow:
   and temper colours; `ship_export.py` bakes the height into a tangent-space normal map and exports
   `assets/jupiter.glb` (+ `jupiter-vega.jpg`, Vega's blue livery, and `jupiter.json`, the gameplay anchors).
   `ship_look.py` renders Cycles stills; `ship_mobile.py` writes the half-size copies phones load.
+  `gltf_json.py` writes a self-contained `.gltf.json` beside each `.glb` (data embedded); that's what the
+  game loads, because some static hosts won't serve `.glb`.
 - **The asteroids** (`rocks.py`): six star-shaped bodies — potato, rubble pile, fractured shard, contact
   binary, spinning top, lumpy — with craters (power-law sizes, bowls, rims, ejecta), boulders and ridged
   detail. One octahedral texture per rock serves all three LODs, the normal map is object-space and exact,
