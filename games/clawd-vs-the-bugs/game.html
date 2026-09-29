@@ -117,6 +117,7 @@ const sfx = {
   hurt: () => { tone(520, 60, 0.45, 'sawtooth', 0.08); noise(0.3, 0.16, 900); }, life: () => [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone(f, f, 0.1, 'square', 0.045), i * 80)),
   wave: () => [392, 523, 659].forEach((f, i) => setTimeout(() => tone(f, f, 0.12, 'square', 0.04), i * 90)), over: () => [392, 330, 262, 196].forEach((f, i) => setTimeout(() => tone(f, f * 0.96, 0.25, 'square', 0.05), i * 190)),
 };
+for (const k of Object.keys(sfx)) { const f = sfx[k]; sfx[k] = () => { if (window.__game_ev) window.__game_ev(k); f(); }; }
 let step = 0, musicTimer = 0;
 const BASS = [55, 55, 82, 55, 65, 65, 98, 65, 73, 73, 110, 73, 49, 49, 73, 49];
 function music() {
@@ -256,7 +257,7 @@ function update(dt) {
 
 /* ---------- draw ---------- */
 function drawBoss(e) {
-  const x = Math.round(e.x), y = Math.round(e.y), fl = e.fl > 0, body = fl ? '#fff' : '#f87171', dark = fl ? '#fff' : '#a13a3a', mand = Math.sin(e.ph * 6) > 0 ? 2 : 0;
+  const x = Math.round(e.x), y = Math.round(e.y), fl = e.fl > 0 && Math.floor(clock * 30) % 2 === 0, body = fl ? '#fff' : '#f87171', dark = fl ? '#fff' : '#a13a3a', mand = Math.sin(e.ph * 6) > 0 ? 2 : 0;
   g.fillStyle = dark; for (let i = -1; i <= 1; i++) { g.fillRect(x - 30, y + 2 + i * 8 + (Math.sin(e.ph * 5 + i) > 0 ? 1 : 0), 8, 2); g.fillRect(x + 22, y + 2 + i * 8 + (Math.sin(e.ph * 5 + i + 2) > 0 ? 1 : 0), 8, 2); }
   g.fillStyle = body; g.fillRect(x - 24, y - 8, 48, 22); g.fillRect(x - 16, y - 16, 32, 10); g.fillStyle = dark; g.fillRect(x - 24, y + 10, 48, 4); g.fillRect(x - 6, y - 8, 12, 2);
   g.fillStyle = '#fff'; g.fillRect(x - 12, y - 14, 9, 8); g.fillRect(x + 3, y - 14, 9, 8); const ex = Math.max(-2, Math.min(2, (p.x - e.x) / 40)); g.fillStyle = '#1a0f0a'; g.fillRect(x - 9 + ex, y - 11, 4, 5); g.fillRect(x + 6 + ex, y - 11, 4, 5);
@@ -300,6 +301,15 @@ reset(); state = 'title'; resize(); hud();
 let last = performance.now();
 function frame(now) { const dt = Math.max(0, Math.min(0.033, (now - last) / 1000)); last = now; update(dt); draw(); hud(); requestAnimationFrame(frame); }
 requestAnimationFrame(frame); music();
-window.__game = { get state() { return state; }, get score() { return score; }, get wave() { return wave; }, get lives() { return lives; }, start };
+window.__game = {
+  get state() { return state; }, get score() { return score; }, get wave() { return wave; }, get lives() { return lives; }, start,
+  // Hooks used by the trailer recorder (tools/capture-game.mjs): step the game by hand and read its state.
+  tick(dt) { update(dt); draw(); }, mute(v) { muted = v; },
+  warp(n) { enemies = []; boss = null; bossN = Math.max(0, Math.floor(n / 5) - 1); wave = n; startWave(); },
+  give(k) { if (k === 'S') p.spread = 12; if (k === 'R') p.rapid = 12; if (k === 'H') p.shield = true; },
+  setInput(x, fire) { ptr.x = x; ptr.down = !!fire; },
+  snap() { return { score, wave, lives, mult: 1 + Math.floor(combo / 3), spread: p.spread, rapid: p.rapid, shield: p.shield, inv: p.inv, px: p.x, py: p.y, state,
+    enemies: enemies.map((e) => ({ t: e.t, x: e.x, y: e.y, hp: e.hp })), ebul: ebul.map((b) => ({ x: b.x, y: b.y })), pups: pups.map((u) => ({ k: u.k, x: u.x, y: u.y })), boss: boss ? { hp: boss.hp, max: boss.max, x: boss.x, y: boss.y } : null, bullets: bullets.length }; },
+};
 })();
 </script>

@@ -5,3 +5,4 @@ out/*-video.mp4
 out/*.mp4
 out/*.log
 out/*.mbtree
+assets/gameplay/
