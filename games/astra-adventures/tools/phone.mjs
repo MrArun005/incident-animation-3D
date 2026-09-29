@@ -1,0 +1,12 @@
+import { open } from './harness.mjs';
+import { chromium } from '/home/user/incident-animation-3d/cartoons/node_modules/playwright-core/index.mjs';
+const SP = '/tmp/claude-0/-home-user-3D-Game/a8e029d3-2f16-59c3-b012-4582e92c4956/scratchpad';
+const g = await open({ width: 390, height: 844 });
+await g.page.evaluate(() => document.body.classList.add('touching'));
+await g.step(20); await g.page.screenshot({ path: `${SP}/astra-phone-title.png` });
+const over = await g.page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+await g.page.click('#bLaunch'); await g.step(120);
+await g.page.screenshot({ path: `${SP}/astra-phone-fly.png` });
+console.log('horizontal overflow:', over.sw > over.cw ? `YES ${over.sw} > ${over.cw}` : 'none', '| touch controls visible:', await g.page.evaluate(() => !document.getElementById('touch').hidden));
+console.log('errors', g.errors.filter((e) => !e.includes('RETRIES')));
+await g.browser.close();

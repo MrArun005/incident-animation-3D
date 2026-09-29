@@ -1,0 +1,1118 @@
+<title>Astra Adventures</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@700;900&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@400;500;600&display=swap">
+<style>
+/* Layout: the flight view fills the window. Corners carry the instruments (brand top-left, pass score
+   top-right, speed / boost / hull bottom-centre, radio bottom-left, keys bottom-right). The centre carries
+   the nose reticle, the flight-path marker and Vega's bracket. Title and pause are panels over the view. */
+:root {
+  --void: #05070d;
+  --panel: rgba(8, 11, 20, 0.66);
+  --rule: rgba(236, 231, 218, 0.16);
+  --hull: #ece7da;          /* worn white hull panels */
+  --dim: #8e94a4;
+  --mark: #f2c230;          /* hull marking yellow */
+  --vega: #7fc8ff;          /* the wingman */
+  --warn: #ff5a4f;
+  --display: 'Big Shoulders Stencil Display', 'Big Shoulders Stencil', 'Arial Narrow', Impact, sans-serif;
+  --label: 'IBM Plex Sans Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { margin: 0; background: var(--void); color: var(--hull); font-family: var(--label); overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: none; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; cursor: grab; outline: none; }
+#view.drag { cursor: grabbing; }
+.lbl { font: 500 11px/1.25 var(--label); letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.num { font: 500 15px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--hull); }
+kbd { font: 500 11px/1 var(--mono); color: var(--hull); border: 1px solid var(--rule); background: rgba(236, 231, 218, 0.06); border-radius: 3px; padding: 3px 6px; white-space: nowrap; }
+
+/* ---- HUD ---- */
+.hud { position: fixed; inset: 0; pointer-events: none; box-sizing: border-box; display: grid; grid-template-columns: 1fr auto 1fr; grid-template-rows: auto 1fr auto; gap: 12px;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.hud[hidden] { display: none; }
+.brand { grid-area: 1 / 1; align-self: start; text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85); }
+.brand .t { font: 900 24px/0.9 var(--display); letter-spacing: 0.05em; color: var(--hull); }
+.brand .s { margin-top: 5px; }
+.score { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.85); grid-area: 1 / 3; justify-self: end; text-align: right; display: grid; gap: 5px; justify-items: end; }
+.score .big { font: 600 28px/1 var(--mono); font-variant-numeric: tabular-nums; color: var(--mark); }
+.score .row { display: flex; gap: 14px; }
+.inst { grid-area: 3 / 2; align-self: end; display: grid; grid-template-columns: auto minmax(120px, 190px); gap: 7px 16px; align-items: center; background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 10px 14px; }
+.speed { grid-row: 1 / span 2; font: 600 40px/1 var(--mono); font-variant-numeric: tabular-nums; min-width: 4.2ch; text-align: right; }
+.speed small { display: block; font: 500 10px/1.4 var(--label); letter-spacing: 0.16em; color: var(--dim); text-align: right; }
+.meter { display: grid; gap: 4px; }
+.meter .lbl { display: flex; justify-content: space-between; }
+.bar { position: relative; height: 7px; background: rgba(236, 231, 218, 0.12); overflow: hidden; }
+.bar i { position: absolute; inset: 0 auto 0 0; width: 100%; background: var(--mark); transform-origin: left center; }
+.bar.hull i { background: var(--hull); }
+.bar.low i { background: var(--warn); }
+.inst.boosting { border-color: rgba(242, 194, 48, 0.55); }
+.radio { grid-area: 3 / 1; align-self: end; max-width: 34ch; min-width: 0; display: grid; gap: 4px; opacity: 0; transition: opacity 0.25s; }
+.radio.on { opacity: 1; }
+.radio .who { font: 600 11px/1 var(--label); letter-spacing: 0.18em; color: var(--vega); }
+.radio .txt { font: 500 15px/1.35 var(--label); color: var(--hull); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.8); }
+.keys { grid-area: 3 / 3; justify-self: end; align-self: end; display: grid; grid-template-columns: auto auto; gap: 5px 10px; align-items: center; justify-items: start; }
+.keys .lbl { letter-spacing: 0.1em; }
+.corner-btn { pointer-events: auto; font: 600 11px/1 var(--label); letter-spacing: 0.16em; color: var(--hull); background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 8px 10px; cursor: pointer; }
+.corner-btn:hover { border-color: var(--mark); }
+button:focus-visible { outline: 2px solid var(--mark); outline-offset: 2px; }
+
+/* ---- centre marks ---- */
+.mark { position: fixed; left: 0; top: 0; pointer-events: none; will-change: transform; }
+#reticle { margin: -17px 0 0 -17px; color: rgba(236, 231, 218, 0.85); }
+#fpm { margin: -12px 0 0 -20px; color: var(--mark); }
+#wing { width: 40px; height: 40px; margin: -20px 0 0 -20px; color: var(--vega); }
+.mark svg { display: block; overflow: visible; filter: drop-shadow(0 1px 3px rgba(0, 0, 0, 0.8)); }
+#wing .t { position: absolute; left: 46px; top: 4px; white-space: nowrap; font: 600 11px/1.2 var(--label); letter-spacing: 0.14em; color: var(--vega); text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9); }
+#wing .t span { display: block; font: 500 11px var(--mono); letter-spacing: 0; color: var(--hull); opacity: 0.8; }
+#wingArrow { width: 0; height: 0; margin: -9px 0 0 -9px; border: 9px solid transparent; border-left: 14px solid var(--vega); }
+#popup { position: fixed; left: 50%; top: 27%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; opacity: 0; }
+#popup .a { font: 900 38px/1 var(--display); letter-spacing: 0.07em; color: var(--mark); text-shadow: 0 0 24px rgba(242, 194, 48, 0.35), 0 2px 10px rgba(0, 0, 0, 0.7); }
+#popup .b { margin-top: 6px; font: 500 15px/1.2 var(--mono); color: var(--hull); text-shadow: 0 1px 8px rgba(0, 0, 0, 0.9); }
+.flash { position: fixed; top: 0; bottom: 0; width: 34vw; pointer-events: none; opacity: 0; }
+#flashL { left: 0; background: linear-gradient(90deg, rgba(242, 194, 48, 0.32), rgba(242, 194, 48, 0)); }
+#flashR { right: 0; background: linear-gradient(270deg, rgba(242, 194, 48, 0.32), rgba(242, 194, 48, 0)); }
+#dmg { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(255, 90, 79, 0) 45%, rgba(255, 90, 79, 0.42) 100%); }
+#toast { position: fixed; left: 50%; top: 14%; transform: translateX(-50%); pointer-events: none; font: 500 14px/1.3 var(--mono); color: var(--hull); background: var(--panel); border: 1px solid var(--rule); border-radius: 3px; padding: 8px 12px; opacity: 0; transition: opacity 0.2s; max-width: calc(100vw - 32px); box-sizing: border-box; text-align: center; }
+#toast.on { opacity: 1; }
+
+/* ---- overlays ---- */
+.ov { position: fixed; inset: 0; box-sizing: border-box; display: grid; align-items: center; padding: 24px max(16px, 6vw); overflow-y: auto; }
+.ov[hidden] { display: none; }
+#ovTitle { background: linear-gradient(90deg, rgba(5, 7, 13, 0.92) 0%, rgba(5, 7, 13, 0.7) 42%, rgba(5, 7, 13, 0) 72%); }
+#ovPause, #ovBreach { background: rgba(5, 7, 13, 0.5); justify-items: center; pointer-events: none; }
+#ovPause .card { pointer-events: auto; }
+.card { width: 100%; max-width: 560px; display: grid; gap: 18px; min-width: 0; }
+.eyebrow { font: 500 12px/1.3 var(--mono); letter-spacing: 0.16em; color: var(--mark); text-transform: uppercase; }
+h1 { margin: 0; font: 900 clamp(58px, 10.5vw, 136px)/0.84 var(--display); letter-spacing: 0.015em; color: var(--hull); text-wrap: balance; }
+h2 { margin: 0; font: 900 44px/0.9 var(--display); letter-spacing: 0.04em; color: var(--hull); }
+.hazard { width: 220px; max-width: 60%; height: 10px; background: repeating-linear-gradient(-45deg, var(--mark) 0 11px, #15171c 11px 22px); }
+.lede { margin: 0; font: 400 17px/1.45 var(--label); color: var(--hull); max-width: 46ch; }
+.lede b { font-weight: 600; color: var(--mark); }
+.spec { display: flex; flex-wrap: wrap; gap: 6px 18px; font: 500 12px/1.3 var(--mono); color: var(--dim); }
+.spec span b { color: var(--hull); font-weight: 500; }
+.keygrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 9px 18px; }
+.keygrid div { display: flex; align-items: center; gap: 10px; font: 400 14px/1.2 var(--label); color: var(--hull); min-width: 0; }
+.keygrid div span { display: flex; gap: 4px; flex: 0 0 auto; }
+.actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+button.go { font: 900 26px/1 var(--display); letter-spacing: 0.1em; color: #17130a; background: var(--mark); border: 0; border-radius: 3px; padding: 14px 30px 12px; cursor: pointer; }
+button.go:hover { background: #ffd24a; }
+button.sec { font: 600 13px/1 var(--label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--hull); background: transparent; border: 1px solid var(--rule); border-radius: 3px; padding: 11px 14px; cursor: pointer; }
+button.sec:hover { border-color: var(--mark); }
+button.sec[aria-pressed="true"] { border-color: var(--mark); color: var(--mark); }
+.pausecard { max-width: 520px; background: rgba(8, 11, 20, 0.9); border: 1px solid var(--rule); border-radius: 4px; padding: 22px; }
+.pausecard .actions { gap: 10px; }
+.note { font: 400 13px/1.45 var(--label); color: var(--dim); margin: 0; }
+#fail { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px 16px; text-align: center; }
+#fail[hidden] { display: none; }
+
+/* ---- touch controls (phones and tablets) ---- */
+.touch { position: fixed; inset: auto 0 0 0; height: 0; pointer-events: none; }
+.touch[hidden] { display: none; }
+#stick { position: fixed; left: max(20px, env(safe-area-inset-left, 0px)); bottom: max(22px, env(safe-area-inset-bottom, 0px)); width: 132px; height: 132px; border-radius: 50%; border: 1px solid var(--rule); background: rgba(8, 11, 20, 0.45); pointer-events: auto; touch-action: none; }
+#knob { position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px; border-radius: 50%; background: rgba(236, 231, 218, 0.22); border: 1px solid rgba(236, 231, 218, 0.4); }
+.tbtns { position: fixed; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(22px, env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(3, 58px); gap: 10px; pointer-events: auto; }
+.tbtns button { height: 58px; border-radius: 50%; border: 1px solid var(--rule); background: rgba(8, 11, 20, 0.5); color: var(--hull); font: 600 11px/1 var(--label); letter-spacing: 0.08em; touch-action: none; }
+.tbtns button.b { grid-column: 2; background: rgba(242, 194, 48, 0.2); border-color: rgba(242, 194, 48, 0.6); color: var(--mark); }
+body.touching .keys { display: none; }
+body.touching .inst { margin-bottom: 150px; }
+
+@media (max-width: 720px) {
+  .hud { grid-template-columns: 1fr 1fr; grid-template-rows: auto auto 1fr auto; }
+  .brand .t { font-size: 20px; }
+  .score { grid-area: 1 / 2; }
+  .score .big { font-size: 22px; }
+  .inst { grid-area: 4 / 1 / 5 / 3; justify-self: center; }
+  .radio { grid-area: 2 / 1 / 3 / 3; align-self: start; }
+  .keys { display: none; }
+  .speed { font-size: 32px; }
+  h2 { font-size: 36px; }
+}
+@media (prefers-reduced-motion: reduce) { .radio, #toast { transition: none; } }
+</style>
+
+<canvas id="view" tabindex="0" aria-label="Astra Adventures flight view"></canvas>
+
+<div class="hud" id="hud" hidden>
+  <div class="brand"><div class="t">ASTRA ADVENTURES</div><div class="s lbl">Jupiter Class IV · flight test</div></div>
+  <div class="score">
+    <div class="lbl">Pass score</div>
+    <div class="big" id="hScore">000000</div>
+    <div class="row"><span class="lbl">Streak <span class="num" id="hStreak">×1</span></span><span class="lbl">Closest <span class="num" id="hClosest">—</span></span></div>
+    <button class="corner-btn" id="btnPause" type="button">PAUSE</button>
+  </div>
+  <div class="inst" id="inst">
+    <div class="speed"><span id="hSpeed">0</span><small>m/s</small></div>
+    <div class="meter"><div class="lbl"><span>Boost</span><span id="hBoostTxt">100%</span></div><div class="bar"><i id="hBoost"></i></div></div>
+    <div class="meter"><div class="lbl"><span>Hull</span><span id="hHullTxt">100%</span></div><div class="bar hull" id="hHullBar"><i id="hHull"></i></div></div>
+  </div>
+  <div class="radio" id="radio"><div class="who">VEGA</div><div class="txt" id="radioTxt"></div></div>
+  <div class="keys" id="keys">
+    <span><kbd>↑</kbd> <kbd>↓</kbd></span><span class="lbl" id="kPitch">Pitch</span>
+    <span><kbd>←</kbd> <kbd>→</kbd></span><span class="lbl">Steer</span>
+    <span><kbd>A</kbd> <kbd>D</kbd></span><span class="lbl">Slide</span>
+    <span><kbd>Shift</kbd></span><span class="lbl">Boost</span>
+    <span><kbd>Space</kbd></span><span class="lbl">Wing guns</span>
+    <span><kbd>Drag</kbd></span><span class="lbl">Look around</span>
+    <span><kbd>P</kbd> <kbd>R</kbd> <kbd>I</kbd></span><span class="lbl">Pause · reset · invert</span>
+  </div>
+</div>
+
+<div class="mark" id="reticle" hidden><svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true"><path d="M3 17h9M22 17h9M17 3v9M17 22v9" stroke="currentColor" stroke-width="2" fill="none"/></svg></div>
+<div class="mark" id="fpm" hidden><svg width="40" height="24" viewBox="0 0 40 24" aria-hidden="true"><circle cx="20" cy="12" r="6" stroke="currentColor" stroke-width="2" fill="none"/><path d="M3 12h10M27 12h10M20 6V1" stroke="currentColor" stroke-width="2" fill="none"/></svg></div>
+<div class="mark" id="wing" hidden><svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true"><path d="M2 12V2h10M28 2h10v10M38 28v10H28M12 38H2V28" stroke="currentColor" stroke-width="2" fill="none"/></svg><div class="t">VEGA<span id="wingDist">0 m</span></div></div>
+<div class="mark" id="wingArrow" hidden></div>
+<div id="popup"><div class="a" id="popA"></div><div class="b" id="popB"></div></div>
+<div class="flash" id="flashL"></div><div class="flash" id="flashR"></div>
+<div id="dmg"></div>
+<div id="toast"></div>
+
+<div class="touch" id="touch" hidden>
+  <div id="stick" aria-label="Steer"><div id="knob"></div></div>
+  <div class="tbtns">
+    <button type="button" id="tLeft" aria-label="Slide left">◀ A</button>
+    <button type="button" id="tFire" aria-label="Fire">FIRE</button>
+    <button type="button" id="tRight" aria-label="Slide right">D ▶</button>
+    <button type="button" class="b" id="tBoost" aria-label="Boost">BOOST</button>
+  </div>
+</div>
+
+<div class="ov" id="ovTitle">
+  <div class="card">
+    <div class="eyebrow">Flight test 01 · blockout build</div>
+    <h1>ASTRA<br>ADVENTURES</h1>
+    <div class="hazard" aria-hidden="true"></div>
+    <p class="lede">Take the <b>Jupiter Class IV</b> through a sparse rock field with Vega on your right wing. Nothing to shoot for yet: fly close to rocks and the closer you pass, the more it scores.</p>
+    <div class="spec"><span>Hull <b>JC-IV / 07</b></span><span>Engines <b>3</b></span><span>Wing guns <b>2</b></span><span>Wingman <b>Vega</b></span></div>
+    <div class="keygrid">
+      <div><span><kbd>←</kbd><kbd>→</kbd></span>Steer</div>
+      <div><span><kbd>↑</kbd><kbd>↓</kbd></span>Pitch</div>
+      <div><span><kbd>Shift</kbd></span>Boost</div>
+      <div><span><kbd>A</kbd><kbd>D</kbd></span>Slide sideways</div>
+      <div><span><kbd>Drag</kbd></span>Look around the ship</div>
+      <div><span><kbd>Space</kbd></span>Fire wing guns</div>
+      <div><span><kbd>P</kbd><kbd>Esc</kbd></span>Pause</div>
+      <div><span><kbd>R</kbd></span>Reset flight</div>
+    </div>
+    <div class="actions">
+      <button class="go" id="bLaunch" type="button">LAUNCH</button>
+      <button class="sec" id="bInvT" type="button" aria-pressed="false">Inverted pitch: off</button>
+    </div>
+    <p class="note" id="tNote">Press Enter to launch. This build needs a keyboard, or the on-screen stick on a touch screen.</p>
+  </div>
+</div>
+
+<div class="ov" id="ovPause" hidden>
+  <div class="card pausecard">
+    <h2>PAUSED</h2>
+    <p class="note">Drag to look around the ship while paused.</p>
+    <div class="actions">
+      <button class="go" id="bResume" type="button">RESUME</button>
+      <button class="sec" id="bReset" type="button">Reset flight (R)</button>
+    </div>
+    <div class="actions">
+      <button class="sec" id="bInv" type="button" aria-pressed="false">Inverted pitch: off</button>
+      <button class="sec" id="bMute" type="button" aria-pressed="true">Sound: on</button>
+    </div>
+    <p class="note" id="invNote">Off: ↑ lifts the nose. On: ↑ drops the nose, like a flight stick.</p>
+  </div>
+</div>
+
+<div class="ov" id="ovBreach" hidden>
+  <div class="card pausecard" style="text-align:center;justify-items:center">
+    <h2 style="color:var(--warn)">HULL BREACH</h2>
+    <p class="note">Rocks don't move. Back to the start line in a moment.</p>
+  </div>
+</div>
+
+<div id="fail" hidden><p class="lede">Astra Adventures needs WebGL, and this browser didn't provide it. Try a current desktop browser.</p></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+'use strict';
+const $ = (id) => document.getElementById(id);
+const T = window.THREE;
+const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+const MANUAL = !!window.__ASTRA_MANUAL;            // set by the test harness: the game advances only on __astra.step()
+let renderer = null;
+if (T) { try { renderer = new T.WebGLRenderer({ canvas: $('view'), antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: MANUAL }); } catch (e) { renderer = null; } }
+if (!renderer) { $('fail').hidden = false; $('ovTitle').hidden = true; return; }
+
+/* ================================ helpers ================================ */
+const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
+const lerp = (a, b, t) => a + (b - a) * t;
+const approach = (a, b, tau, dt) => b + (a - b) * Math.exp(-dt / tau);
+const V3 = (x = 0, y = 0, z = 0) => new T.Vector3(x, y, z);
+const AX = V3(1, 0, 0), AY = V3(0, 1, 0), AZ = V3(0, 0, 1), AF = V3(0, 0, -1);
+function mulberry(a) { return () => { a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const unit = (r) => { const u = r() * 2 - 1, a = r() * Math.PI * 2, s = Math.sqrt(1 - u * u); return V3(s * Math.cos(a), u, s * Math.sin(a)); };
+const gauss = (r) => { let s = 0; for (let i = 0; i < 4; i++) s += r(); return (s - 2) * 1.73; };
+function hash3(x, y, z) { let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(z, 1440670441); h = Math.imul(h ^ (h >>> 13), 1274126177); return ((h ^ (h >>> 16)) >>> 0) / 4294967296; }
+function vnoise(x, y, z) {
+  const xi = Math.floor(x), yi = Math.floor(y), zi = Math.floor(z), xf = x - xi, yf = y - yi, zf = z - zi;
+  const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf), w = zf * zf * (3 - 2 * zf);
+  const c = (a, b, d) => hash3(xi + a, yi + b, zi + d);
+  const x00 = lerp(c(0, 0, 0), c(1, 0, 0), u), x10 = lerp(c(0, 1, 0), c(1, 1, 0), u), x01 = lerp(c(0, 0, 1), c(1, 0, 1), u), x11 = lerp(c(0, 1, 1), c(1, 1, 1), u);
+  return lerp(lerp(x00, x10, v), lerp(x01, x11, v), w) * 2 - 1;
+}
+const fbm = (x, y, z) => vnoise(x, y, z) * 0.6 + vnoise(x * 2.1, y * 2.1, z * 2.1) * 0.28 + vnoise(x * 4.3, y * 4.3, z * 4.3) * 0.12;
+function radial(size, stops) { const c = document.createElement('canvas'); c.width = c.height = size; const g = c.getContext('2d'), gr = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2); stops.forEach(([o, col]) => gr.addColorStop(o, col)); g.fillStyle = gr; g.fillRect(0, 0, size, size); const t = new T.CanvasTexture(c); return t; }
+
+/* ================================ tuning ================================ */
+// The flight model. Weight comes from three places: rotation eases in and out (rotTau), the velocity keeps
+// pointing where you were going and bleeds into the new heading (driftTau), and speed changes are
+// acceleration-limited, so a boost takes a moment to build and a moment to die away.
+const FM = {
+  cruise: 42, boost: 108, accel: 18, boostAccel: 58, decel: 20, boostDecel: 30,
+  pitchRate: 1.1, yawRate: 0.95, rateBoostScale: 0.7, rotTauIn: 0.27, rotTauOut: 0.36,
+  strafeSpeed: 20, strafeTau: 0.42, driftTau: 0.95, levelRate: 0.6,
+  boostDrain: 0.24, boostRecharge: 0.15, rechargeDelay: 0.8,
+};
+const PASS = 9;                                    // a pass inside this many metres of rock scores
+const FIELD = 1300, HALF = FIELD / 2;              // the rock field wraps around the ship in a 1.3 km cube
+const SUN_DIR = V3(0.72, 0.46, 0.52).normalize();
+
+/* ================================ scene ================================ */
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+renderer.outputEncoding = T.sRGBEncoding;
+renderer.toneMapping = T.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
+const FOGC = 0x070a12;
+renderer.setClearColor(FOGC);
+const scene = new T.Scene();
+scene.fog = new T.FogExp2(FOGC, 0.0019);
+const camera = new T.PerspectiveCamera(62, 1, 0.25, 12000);
+const sunLight = new T.DirectionalLight(0xfff0dc, 1.75);
+sunLight.position.copy(SUN_DIR).multiplyScalar(100); scene.add(sunLight); scene.add(sunLight.target);
+scene.add(new T.HemisphereLight(0x5b77b8, 0x1b140e, 0.62));
+
+// Sky: an equirect canvas with a faint galactic band and a warm glow where the sun sits.
+const sky = (() => {
+  const W = 2048, H = 1024, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
+  g.fillStyle = '#05070d'; g.fillRect(0, 0, W, H);
+  const r = mulberry(4);
+  const blob = (x, y, rad, rgb, a) => { for (const dx of [-W, 0, W]) { const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, rad); gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(x + dx - rad, y - rad, rad * 2, rad * 2); } };
+  const band = (x) => H * 0.5 + Math.sin((x / W) * Math.PI * 2 + 0.7) * H * 0.2;
+  for (let i = 0; i < 260; i++) { const x = r() * W, y = band(x) + gauss(r) * 55; blob(x, y, 40 + r() * 120, r() < 0.5 ? '70,90,160' : '110,80,150', 0.035 + r() * 0.05); }
+  for (let i = 0; i < 70; i++) { const x = r() * W, y = band(x) + gauss(r) * 20; blob(x, y, 20 + r() * 50, '14,12,20', 0.28); }
+  for (let i = 0; i < 18; i++) blob(r() * W, r() * H, 200 + r() * 260, r() < 0.5 ? '40,60,120' : '90,50,110', 0.035);
+  const th = Math.acos(SUN_DIR.y), ph = Math.atan2(SUN_DIR.z, -SUN_DIR.x), su = ((ph / (Math.PI * 2)) % 1 + 1) % 1;
+  blob(su * W, (th / Math.PI) * H, 520, '255,170,110', 0.22); blob(su * W, (th / Math.PI) * H, 160, '255,215,170', 0.3);
+  const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding;
+  const m = new T.Mesh(new T.SphereGeometry(6000, 48, 24), new T.MeshBasicMaterial({ map: tex, side: T.BackSide, fog: false, depthWrite: false }));
+  m.renderOrder = -10; scene.add(m); return m;
+})();
+function starLayer(n, size, seed, bandBias) {
+  const r = mulberry(seed), pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const tints = [[1, 1, 1], [0.78, 0.86, 1], [1, 0.9, 0.74]];
+  for (let i = 0; i < n; i++) {
+    let d = unit(r);
+    if (bandBias && r() < 0.45) { const a = r() * Math.PI * 2, tilt = 0.45; d = V3(Math.cos(a), Math.sin(a) * Math.sin(tilt) + gauss(r) * 0.08, Math.sin(a) * Math.cos(tilt)).normalize(); }
+    pos.set([d.x * 5000, d.y * 5000, d.z * 5000], i * 3);
+    const t = tints[(r() * 3) | 0], b = 0.3 + r() ** 2 * 0.7; col.set([t[0] * b, t[1] * b, t[2] * b], i * 3);
+  }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
+  const p = new T.Points(geo, new T.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false, transparent: true }));
+  p.renderOrder = -9; scene.add(p); return p;
+}
+const stars = [starLayer(3200, 1.4, 11, true), starLayer(260, 2.6, 12, false)];
+const glowTex = radial(128, [[0, 'rgba(255,255,255,1)'], [0.18, 'rgba(255,230,190,0.85)'], [0.45, 'rgba(255,160,90,0.22)'], [1, 'rgba(255,120,60,0)']]);
+const dotTex = radial(64, [[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.6)'], [1, 'rgba(255,255,255,0)']]);
+const sunSprite = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffe2c0, blending: T.AdditiveBlending, depthWrite: false, fog: false, transparent: true }));
+sunSprite.scale.set(900, 900, 1); sunSprite.renderOrder = -8; scene.add(sunSprite);
+
+/* ================================ rocks ================================ */
+function heightAt(S, x, y, z) {
+  let h = 1 + S.amp * fbm(x * 1.8 + S.off[0], y * 1.8 + S.off[1], z * 1.8 + S.off[2]);
+  for (const c of S.craters) { const d = Math.hypot(x - c.x, y - c.y, z - c.z) / c.rad; if (d < 1) h -= c.depth * (1 - d * d); else if (d < 1.35) h += c.depth * 0.4 * Math.sin(((d - 1) / 0.35) * Math.PI); }
+  return h;
+}
+// Distance from the rock centre to its surface along a unit direction (rock-local), in units of the rock's scale.
+// This is the same function that shaped the mesh, so a skim is measured against the rock you see.
+function surfR(S, ux, uy, uz) {
+  let x = ux / S.axes[0], y = uy / S.axes[1], z = uz / S.axes[2]; const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
+  const h = heightAt(S, x, y, z);
+  return Math.hypot(x * h * S.axes[0], y * h * S.axes[1], z * h * S.axes[2]) * S.norm;
+}
+function makeShape(seed, detail) {
+  const r = mulberry(seed);
+  const S = { off: [r() * 40, r() * 40, r() * 40], axes: [0.86 + r() * 0.3, 0.8 + r() * 0.24, 0.88 + r() * 0.3], amp: 0.1 + r() * 0.07, craters: [], norm: 1, maxR: 1 };
+  const nc = 3 + ((r() * 5) | 0);
+  for (let i = 0; i < nc; i++) { const d = unit(r); S.craters.push({ x: d.x, y: d.y, z: d.z, rad: 0.2 + r() * 0.28, depth: 0.035 + r() * 0.06 }); }
+  const geo = new T.IcosahedronGeometry(1, detail), p = geo.attributes.position, v = V3();
+  let sum = 0;
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).normalize(); const h = heightAt(S, v.x, v.y, v.z); v.multiplyScalar(h); v.x *= S.axes[0]; v.y *= S.axes[1]; v.z *= S.axes[2]; p.setXYZ(i, v.x, v.y, v.z); sum += v.length(); }
+  S.norm = p.count / sum;
+  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).multiplyScalar(S.norm); p.setXYZ(i, v.x, v.y, v.z); S.maxR = Math.max(S.maxR, v.length()); }
+  geo.computeVertexNormals(); S.geo = geo; return S;
+}
+const SHAPES = []; for (let k = 0; k < 8; k++) SHAPES.push(makeShape(900 + k * 131, k < 4 ? 3 : 2));
+const ROCKS = [];
+function addRock(c, s, r) {
+  const k = s > 17 ? (r() * 4) | 0 : 4 + ((r() * 4) | 0);
+  const q = new T.Quaternion().setFromEuler(new T.Euler(r() * 6.3, r() * 6.3, r() * 6.3));
+  const tone = 0.2 + r() * 0.17, warm = r() * 0.04 - 0.012;
+  ROCKS.push({ c, s, S: SHAPES[k], k, q, qi: q.clone().invert(), axis: unit(r), spin: (0.012 + r() * 0.08) * (s > 17 ? 0.45 : 1), color: new T.Color(tone + warm, tone, tone - warm * 0.7), reach: 0 });
+}
+(function placeRocks() {
+  const r = mulberry(20260929);
+  // The opening slalom: three rocks just off the straight line from the start, all on Vega's far side.
+  addRock(V3(-(15 + 9.6), 1, -330), 15, r);
+  addRock(V3(-3, -(22 + 5.6), -610), 22, r);
+  addRock(V3(-(34 + 12.5), 2, -900), 34, r);
+  const clusters = Array.from({ length: 7 }, () => V3((r() - 0.5) * FIELD, (r() - 0.5) * FIELD * 0.7, (r() - 0.5) * FIELD));
+  let tries = 0;
+  while (ROCKS.length < 330 && tries++ < 20000) {
+    const c = r() < 0.55 ? clusters[(r() * clusters.length) | 0].clone().add(V3(gauss(r) * 95, gauss(r) * 70, gauss(r) * 95)) : V3((r() - 0.5) * FIELD, (r() - 0.5) * FIELD, (r() - 0.5) * FIELD);
+    for (const a of ['x', 'y', 'z']) c[a] = ((c[a] + HALF) % FIELD + FIELD) % FIELD - HALF;
+    let s = 4 + 15 * r() ** 1.8; const roll = r(); if (roll < 0.09) s = 24 + r() * 26; else if (roll < 0.105) s = 62 + r() * 48;
+    if (Math.abs(c.x) < s * 1.3 + 45 && Math.abs(c.y) < s * 1.3 + 38 && c.z > -1000 && c.z < 90) continue;   // keep the opening run clear
+    if (ROCKS.some((o) => o.c.distanceTo(c) < (o.s + s) * 1.25 + 6)) continue;
+    addRock(c, s, r);
+  }
+})();
+const rockMat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94, metalness: 0.02, flatShading: true });
+const rockMeshes = SHAPES.map((S, k) => {
+  const list = ROCKS.filter((R) => R.k === k);
+  const m = new T.InstancedMesh(S.geo, rockMat, Math.max(1, list.length));
+  m.count = list.length; m.frustumCulled = false; m.instanceMatrix.setUsage(T.DynamicDrawUsage);
+  list.forEach((R, i) => { R.slot = i; m.setColorAt(i, R.color); });
+  if (m.instanceColor) m.instanceColor.needsUpdate = true;
+  scene.add(m); return m;
+});
+ROCKS.forEach((R) => { R.reach = R.s * R.S.maxR; });
+const tmpM = new T.Matrix4(), tmpQ = new T.Quaternion(), tmpS = V3();
+function updateRocks(dt, center) {
+  for (const R of ROCKS) {
+    if (dt > 0) { R.q.premultiply(tmpQ.setFromAxisAngle(R.axis, R.spin * dt)); R.qi.copy(R.q).invert(); }
+    for (const a of ['x', 'y', 'z']) { const d = R.c[a] - center[a]; if (d > HALF) R.c[a] -= FIELD; else if (d < -HALF) R.c[a] += FIELD; }
+    tmpM.compose(R.c, R.q, tmpS.set(R.s, R.s, R.s)); rockMeshes[R.k].setMatrixAt(R.slot, tmpM);
+  }
+  rockMeshes.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
+}
+const gv = V3();
+function gapTo(R, p) {                              // metres from point p to the rock's surface (negative = inside)
+  gv.subVectors(p, R.c); const d = gv.length(); if (d < 1e-4) return -R.s;
+  gv.applyQuaternion(R.qi).divideScalar(d);
+  return d - surfR(R.S, gv.x, gv.y, gv.z) * R.s;
+}
+
+/* ================================ the ship ================================ */
+// Jupiter Class IV blockout: a narrow central body with a pointed nose and canopy, two wings that join the body
+// to the wing engines, a gun on each wing, three engines in all. Ship axes: +X right, +Y up, -Z forward.
+const ENGINE_POS = [V3(0, 0, 6.95), V3(-5.3, 0.05, 4.76), V3(5.3, 0.05, 4.76)];
+const ENGINE_R = [0.5, 0.46, 0.46];
+const GUNS = [V3(-6.05, 0.3, -4.6), V3(6.05, 0.3, -4.6)];
+const SAMPLES = [                                  // collision and close-pass probes, in ship space
+  { p: V3(0, 0.1, -5.4), r: 0.85, part: 'nose' }, { p: V3(0, 0, -1.6), r: 1.25, part: 'hull' }, { p: V3(0, 0, 2.2), r: 1.4, part: 'hull' },
+  { p: V3(0, 0, 5.6), r: 1.0, part: 'hull' }, { p: V3(-5.3, 0.05, 1.7), r: 1.2, part: 'wingtip' }, { p: V3(5.3, 0.05, 1.7), r: 1.2, part: 'wingtip' },
+  { p: V3(-3, 0.05, 1.8), r: 0.8, part: 'wing' }, { p: V3(3, 0.05, 1.8), r: 0.8, part: 'wing' },
+];
+const flameGeo = new T.ConeGeometry(1, 1, 16, 1, true); flameGeo.rotateX(Math.PI / 2); flameGeo.translate(0, 0, 0.5);
+function buildShip(accentHex) {
+  const g = new T.Group();
+  const M = {
+    hull: new T.MeshStandardMaterial({ color: 0xc4c0b6, roughness: 0.6, metalness: 0.1 }),
+    panel: new T.MeshStandardMaterial({ color: 0xa9adb3, roughness: 0.66, metalness: 0.2 }),
+    dark: new T.MeshStandardMaterial({ color: 0x2a2e36, roughness: 0.5, metalness: 0.45 }),
+    glass: new T.MeshStandardMaterial({ color: 0x0b1624, roughness: 0.14, metalness: 0.7, emissive: 0x123b5e, emissiveIntensity: 0.5 }),
+    mark: new T.MeshStandardMaterial({ color: accentHex, roughness: 0.52, metalness: 0.05 }),
+  };
+  const add = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
+  const cylZ = (r1, r2, len, m, x, y, z, seg = 18) => { const geo = new T.CylinderGeometry(r1, r2, len, seg); geo.rotateX(Math.PI / 2); return add(geo, m, x, y, z); };
+  add(new T.BoxGeometry(1.6, 1.2, 8.4), M.hull, 0, 0, 0.3);                               // body
+  const noseG = new T.ConeGeometry(1, 3.4, 4, 1); noseG.rotateY(Math.PI / 4); noseG.rotateX(-Math.PI / 2); noseG.scale(1.131, 0.849, 1);
+  add(noseG, M.hull, 0, 0, -5.6);                                                          // nose
+  const can = add(new T.SphereGeometry(1, 20, 12), M.glass, 0, 0.6, -2.1); can.scale.set(0.6, 0.42, 1.55);
+  add(new T.BoxGeometry(0.55, 0.28, 3.4), M.panel, 0, 0.72, 1.7);                          // dorsal spine
+  add(new T.BoxGeometry(0.9, 0.3, 5.0), M.panel, 0, -0.72, 0.9);                           // keel
+  add(new T.BoxGeometry(1.64, 1.24, 0.34), M.mark, 0, 0, -3.35);                           // nose band
+  cylZ(0.62, 0.72, 2.1, M.dark, 0, 0, 5.45); cylZ(0.8, 0.6, 0.6, M.panel, 0, 0, 6.62);     // centre engine
+  for (const s of [-1, 1]) {
+    const sh = new T.Shape(); sh.moveTo(0.8 * s, -0.4); sh.lineTo(4.7 * s, 0.4); sh.lineTo(4.7 * s, 3.1); sh.lineTo(0.8 * s, 3.6); sh.closePath();
+    const wg = new T.ExtrudeGeometry(sh, { depth: 0.26, bevelEnabled: false }); wg.rotateX(Math.PI / 2); wg.translate(0, 0.18, 0);
+    add(wg, M.hull, 0, 0, 0);                                                              // wing
+    add(new T.BoxGeometry(3.9, 0.22, 0.8), M.panel, s * 2.75, -0.45, 2.7);                 // lower spar: the connection
+    const st = add(new T.BoxGeometry(3.3, 0.03, 0.3), M.mark, s * 2.75, 0.195, 0.42); st.rotation.y = -s * 0.2;   // yellow marking
+    cylZ(0.64, 0.72, 5.0, M.hull, s * 5.3, 0.05, 1.7);                                     // wing engine
+    cylZ(0.7, 0.66, 0.45, M.dark, s * 5.3, 0.05, -0.95);                                   // intake
+    cylZ(0.745, 0.745, 0.5, M.mark, s * 5.3, 0.05, 0.45);                                  // engine band
+    cylZ(0.56, 0.74, 0.55, M.dark, s * 5.3, 0.05, 4.46);                                   // nozzle
+    add(new T.BoxGeometry(0.34, 0.34, 1.6), M.panel, s * 6.05, 0.3, 0.6);                  // gun housing
+    cylZ(0.085, 0.085, 4.2, M.dark, s * 6.05, 0.3, -2.2, 8);                                // barrel
+    cylZ(0.13, 0.13, 0.3, M.dark, s * 6.05, 0.3, -4.35, 8);                                 // muzzle
+    const nav = add(new T.SphereGeometry(0.13, 10, 8), new T.MeshBasicMaterial({ color: s < 0 ? 0xff3b30 : 0x34ff7a }), s * 6.03, 0.05, 3.7); nav.userData.nav = true;
+  }
+  const beacon = add(new T.SphereGeometry(0.12, 10, 8), new T.MeshBasicMaterial({ color: 0xffffff }), 0, 0.92, 3.3);
+  const glowDisc = new T.MeshBasicMaterial({ color: 0xff9a52 });
+  const flames = [], glows = [];
+  ENGINE_POS.forEach((p, i) => {
+    const disc = add(new T.CircleGeometry(ENGINE_R[i] * 1.05, 20), glowDisc, p.x, p.y, p.z - 0.02);
+    const outer = add(flameGeo, new T.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.5, blending: T.AdditiveBlending, depthWrite: false }), p.x, p.y, p.z);
+    const inner = add(flameGeo, new T.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0.75, blending: T.AdditiveBlending, depthWrite: false }), p.x, p.y, p.z);
+    const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffa860, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); glow.position.copy(p).add(V3(0, 0, 0.35)); g.add(glow);
+    flames.push({ outer, inner, r: ENGINE_R[i], disc }); glows.push(glow);
+  });
+  const light = new T.PointLight(0xff8a3c, 1, 45, 2); light.position.set(0, 0, 8); g.add(light);
+  const muzzles = GUNS.map((p) => { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffe08a, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.position.copy(p); s.scale.set(3, 3, 1); s.visible = false; g.add(s); return s; });
+  g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
+  return { g, flames, glows, light, beacon, muzzles };
+}
+
+class Ribbon {                                      // an additive trail that faces the camera
+  constructor(n, color, width) {
+    this.n = n; this.pts = Array.from({ length: n }, () => V3()); this.count = 0; this.color = new T.Color(color); this.width = width;
+    this.pos = new Float32Array(n * 6); this.col = new Float32Array(n * 6);
+    const idx = []; for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(this.pos, 3)); geo.setAttribute('color', new T.BufferAttribute(this.col, 3)); geo.setIndex(idx);
+    this.mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
+    this.mesh.frustumCulled = false; scene.add(this.mesh);
+  }
+  clear() { this.count = 0; }
+  push(p) { const last = this.pts.pop(); last.copy(p); this.pts.unshift(last); this.count = Math.min(this.n, this.count + 1); }
+  update(camPos, k) {
+    const a = V3(), side = V3(), view = V3();
+    const near = (p) => { const d = p.distanceTo(camPos); return d < 10 ? 0 : d > 34 ? 1 : ((d - 10) / 24) ** 2; };
+    for (let i = 0; i < this.n; i++) {
+      const p = this.pts[Math.min(i, Math.max(0, this.count - 1))], p0 = this.pts[Math.max(0, i - 1)], p1 = this.pts[Math.min(this.count - 1, i + 1)];
+      a.subVectors(p0, p1); view.subVectors(camPos, p); side.crossVectors(a, view); const L = side.length();
+      const f = i < this.count ? 1 - i / this.n : 0, w = this.width * (0.25 + 0.75 * f);
+      if (L > 1e-6) side.multiplyScalar(w / L); else side.set(0, 0, 0);
+      this.pos.set([p.x + side.x, p.y + side.y, p.z + side.z, p.x - side.x, p.y - side.y, p.z - side.z], i * 6);
+      const b = f * f * f * k * near(p); this.col.set([this.color.r * b, this.color.g * b, this.color.b * b, this.color.r * b, this.color.g * b, this.color.b * b], i * 6);
+    }
+    this.mesh.geometry.attributes.position.needsUpdate = true; this.mesh.geometry.attributes.color.needsUpdate = true;
+  }
+}
+
+const wq = new T.Quaternion(), we = new T.Euler();
+class Ship {
+  constructor(name, accent, trail, trailLen) {
+    this.name = name; const b = buildShip(accent); Object.assign(this, b); scene.add(this.g);
+    this.pos = V3(); this.vel = V3(); this.q = new T.Quaternion(); this.qv = new T.Quaternion(); this.ang = V3();
+    this.inp = { pitch: 0, yaw: 0, strafe: 0, boost: false, fire: false };
+    this.trails = ENGINE_POS.map((p, i) => new Ribbon(trailLen, trail, ENGINE_R[i] * 0.9));
+    this.speedTarget = null; this.alive = true; this.reset(V3(), new T.Quaternion(), 0);
+  }
+  reset(p, q, speed) {
+    this.pos.copy(p); this.q.copy(q); this.qv.copy(q); this.vel.copy(AF).applyQuaternion(q).multiplyScalar(speed); this.ang.set(0, 0, 0);
+    this.bank = 0; this.boostE = 1; this.boosting = false; this.boostLock = false; this.boostIdle = 9; this.boostVis = 0; this.hull = 100; this.hitCd = 0; this.gunCd = 0; this.gunSide = 1;
+    this.thrust = 0.3; this.alive = true; this.g.visible = true; this.trails.forEach((t) => t.clear()); this.flash = [0, 0];
+    this.g.position.copy(p); this.g.quaternion.copy(q);
+  }
+  axes() { return { f: V3(0, 0, -1).applyQuaternion(this.q), r: V3(1, 0, 0).applyQuaternion(this.q), u: V3(0, 1, 0).applyQuaternion(this.q) }; }
+  update(h) {
+    const I = this.inp, F = FM;
+    const want = I.boost && !this.boostLock && this.boostE > 0.01;
+    if (want) { this.boosting = true; this.boostE = Math.max(0, this.boostE - h * F.boostDrain); this.boostIdle = 0; if (this.boostE <= 0) this.boostLock = true; }
+    else { this.boosting = false; this.boostIdle += h; if (this.boostIdle > F.rechargeDelay) this.boostE = Math.min(1, this.boostE + h * F.boostRecharge); if (this.boostLock && this.boostE > 0.3) this.boostLock = false; }
+    this.boostVis = approach(this.boostVis, this.boosting ? 1 : 0, 0.35, h);
+    // Rotation: the rate eases towards what the stick asks for, and eases out when you let go.
+    const rs = lerp(1, F.rateBoostScale, this.boostVis);
+    this.ang.x = approach(this.ang.x, I.pitch * F.pitchRate * rs, I.pitch ? F.rotTauIn : F.rotTauOut, h);
+    this.ang.y = approach(this.ang.y, -I.yaw * F.yawRate * rs, I.yaw ? F.rotTauIn : F.rotTauOut, h);
+    this.ang.z = approach(this.ang.z, 0, 0.35, h);
+    wq.setFromEuler(we.set(this.ang.x * h, this.ang.y * h, this.ang.z * h, 'XYZ')); this.q.multiply(wq).normalize();
+    // A light flight assist rolls the wings back towards level, so left and right keep meaning left and right.
+    const f = V3(0, 0, -1).applyQuaternion(this.q), u = V3(0, 1, 0).applyQuaternion(this.q), rt = V3(1, 0, 0).applyQuaternion(this.q);
+    if (Math.abs(f.y) < 0.94) { const d = AY.clone().addScaledVector(f, -f.y).normalize(); const err = Math.atan2(u.clone().cross(d).dot(f), u.dot(d)); this.q.premultiply(wq.setFromAxisAngle(f, clamp(err, -1, 1) * F.levelRate * h * (1 - Math.abs(f.y)))); }
+    // Translation: speed is acceleration-limited; sideways velocity (drift, or A/D) decays on its own clock.
+    let fs = this.vel.dot(f), vr = this.vel.dot(rt), vu = this.vel.dot(u);
+    const target = this.boosting ? F.boost : this.speedTarget != null ? this.speedTarget : F.cruise;
+    if (fs < target) fs = Math.min(target, fs + (this.boosting ? F.boostAccel : F.accel) * h); else fs = Math.max(target, fs - (this.boostVis > 0.05 ? F.boostDecel : F.decel) * h);
+    vr = I.strafe ? approach(vr, I.strafe * F.strafeSpeed, F.strafeTau, h) : approach(vr, 0, F.driftTau, h);
+    vu = approach(vu, 0, F.driftTau, h);
+    this.vel.copy(f).multiplyScalar(fs).addScaledVector(rt, vr).addScaledVector(u, vu);
+    this.pos.addScaledVector(this.vel, h);
+    this.bank = approach(this.bank, clamp(-this.ang.y * 0.85 + vr * 0.02, -1.1, 1.1), 0.22, h);
+    this.qv.copy(this.q).multiply(wq.setFromAxisAngle(AF, this.bank));
+    this.thrust = approach(this.thrust, this.boosting ? 1 : clamp(0.32 + (target - fs) / 25, 0.26, 0.75), 0.12, h);
+    this.gunCd -= h; this.hitCd -= h;
+  }
+  world(local, out = V3()) { return out.copy(local).applyQuaternion(this.qv).add(this.pos); }
+}
+
+const player = new Ship('Lead', 0xe8b923, 0xff9a4a, 22);
+const wing = new Ship('Vega', 0x4aa3e8, 0x6fb6ff, 34);
+wing.trailGain = 0.55;                                   // her trail is seen side-on, so it can be quieter
+const START = { lead: V3(0, 0, 0), vega: V3(17, 2.5, -3) };
+
+/* ================================ effects ================================ */
+class Particles {
+  constructor(n, size, color) {
+    this.n = n; this.i = 0; this.pos = new Float32Array(n * 3); this.col = new Float32Array(n * 3); this.vel = new Float32Array(n * 3); this.life = new Float32Array(n); this.max = new Float32Array(n).fill(1); this.base = new T.Color(color);
+    this.tint = new Float32Array(n * 3);
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(this.pos, 3)); geo.setAttribute('color', new T.BufferAttribute(this.col, 3));
+    this.mesh = new T.Points(geo, new T.PointsMaterial({ size, map: dotTex, sizeAttenuation: true, vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false }));
+    this.mesh.frustumCulled = false; scene.add(this.mesh);
+  }
+  emit(p, v, spread, speed, count, life, color, rnd) {
+    const c = color ? new T.Color(color) : this.base;
+    for (let k = 0; k < count; k++) {
+      const i = this.i; this.i = (this.i + 1) % this.n; const d = unit(rnd);
+      const sp = speed * (0.3 + rnd() * 0.7);
+      this.pos.set([p.x, p.y, p.z], i * 3);
+      this.vel.set([v.x + d.x * spread * sp, v.y + d.y * spread * sp, v.z + d.z * spread * sp], i * 3);
+      this.life[i] = this.max[i] = life * (0.5 + rnd() * 0.7); this.tint.set([c.r, c.g, c.b], i * 3);
+    }
+  }
+  update(h, eye) {
+    for (let i = 0; i < this.n; i++) {
+      if (this.life[i] > 0 && eye) { const dx = this.pos[i * 3] - eye.x, dy = this.pos[i * 3 + 1] - eye.y, dz = this.pos[i * 3 + 2] - eye.z; if (dx * dx + dy * dy + dz * dz < 36) this.life[i] = 0; }
+      if (this.life[i] <= 0) { this.col[i * 3] = this.col[i * 3 + 1] = this.col[i * 3 + 2] = 0; this.pos[i * 3 + 1] = -1e7; continue; }
+      this.life[i] -= h; const k = Math.max(0, this.life[i] / this.max[i]), drag = Math.exp(-h * 1.6);
+      for (let a = 0; a < 3; a++) { this.vel[i * 3 + a] *= drag; this.pos[i * 3 + a] += this.vel[i * 3 + a] * h; this.col[i * 3 + a] = this.tint[i * 3 + a] * k * k; }
+    }
+    this.mesh.geometry.attributes.position.needsUpdate = true; this.mesh.geometry.attributes.color.needsUpdate = true;
+  }
+  clear() { this.life.fill(0); }
+}
+const fxr = mulberry(77);
+const sparks = new Particles(700, 0.55, 0xffc46a);
+const dust = new Particles(500, 1.5, 0x5a5650);
+
+// Space dust: short streaks that stream past the ship, so speed reads even in empty space.
+const DUST_N = 750, DUST_BOX = 170;
+const dustPts = Array.from({ length: DUST_N }, () => V3((fxr() - 0.5) * DUST_BOX, (fxr() - 0.5) * DUST_BOX, (fxr() - 0.5) * DUST_BOX));
+const streakPos = new Float32Array(DUST_N * 6), streakCol = new Float32Array(DUST_N * 6);
+const streakGeo = new T.BufferGeometry(); streakGeo.setAttribute('position', new T.BufferAttribute(streakPos, 3)); streakGeo.setAttribute('color', new T.BufferAttribute(streakCol, 3));
+const streaks = new T.LineSegments(streakGeo, new T.LineBasicMaterial({ vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, fog: false }));
+streaks.frustumCulled = false; scene.add(streaks);
+function updateDust(ship, camPos) {
+  const hb = DUST_BOX / 2, len = 0.028 + ship.boostVis * 0.03;
+  for (let i = 0; i < DUST_N; i++) {
+    const p = dustPts[i];
+    for (const a of ['x', 'y', 'z']) { const d = p[a] - ship.pos[a]; if (d > hb) p[a] -= DUST_BOX; else if (d < -hb) p[a] += DUST_BOX; }
+    const dist = p.distanceTo(camPos), b = Math.max(0, 1 - dist / 80) ** 1.6 * (0.55 + ship.boostVis * 0.45);
+    streakPos.set([p.x, p.y, p.z, p.x - ship.vel.x * len, p.y - ship.vel.y * len, p.z - ship.vel.z * len], i * 6);
+    const c = 0.75 * b; streakCol.set([c, c * 0.97, c * 0.92, 0, 0, 0], i * 6);
+  }
+  streakGeo.attributes.position.needsUpdate = true; streakGeo.attributes.color.needsUpdate = true;
+}
+
+// Wing gun bolts.
+const boltGeo = new T.BoxGeometry(0.16, 0.16, 5.5);
+const boltMat = new T.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false });
+const bolts = Array.from({ length: 36 }, () => { const m = new T.Mesh(boltGeo, boltMat); m.visible = false; scene.add(m); return { m, pos: V3(), vel: V3(), life: 0 }; });
+function fireGuns(ship) {
+  if (ship.gunCd > 0 || !ship.alive) return;
+  ship.gunCd = 1 / 8; ship.gunSide = -ship.gunSide; const gi = ship.gunSide < 0 ? 0 : 1;
+  const b = bolts.find((x) => x.life <= 0); if (!b) return;
+  const { f } = ship.axes();
+  ship.world(GUNS[gi], b.pos); b.vel.copy(ship.vel).addScaledVector(f, 430); b.life = 1.3; b.m.visible = true; b.m.quaternion.copy(ship.qv);
+  ship.flash[gi] = 0.06; log('shot', { side: gi ? 1 : -1 }); sfx.pew(gi ? 0.5 : -0.5);
+}
+function updateBolts(h) {
+  for (const b of bolts) {
+    if (b.life <= 0) continue;
+    b.life -= h; b.pos.addScaledVector(b.vel, h); b.m.position.copy(b.pos);
+    if (b.life <= 0) { b.m.visible = false; continue; }
+    for (const R of ROCKS) {
+      const dx = b.pos.x - R.c.x, dy = b.pos.y - R.c.y, dz = b.pos.z - R.c.z, reach = R.reach + 4;
+      if (dx * dx + dy * dy + dz * dz > reach * reach) continue;
+      if (gapTo(R, b.pos) < 0.5) {
+        const n = V3(dx, dy, dz).normalize();
+        sparks.emit(b.pos, n.clone().multiplyScalar(12), 1, 30, 18, 0.45, null, fxr); dust.emit(b.pos, n.clone().multiplyScalar(6), 1, 8, 6, 1.4, null, fxr);
+        b.life = 0; b.m.visible = false; log('chip', {}); sfx.chip(); break;
+      }
+    }
+  }
+}
+
+/* ================================ state ================================ */
+let mode = 'title';                                 // title | fly | breach
+let paused = false, inverted = store.get('astra-invert') === '1', muted = store.get('astra-mute') === '1';
+let clock = 0, simTime = 0, timeScale = 1, hitStop = 0, breachT = 0;
+const run = { score: 0, passes: 0, streak: 0, lastPass: -99, closest: Infinity, hits: 0 };
+let best = +store.get('astra-best') || 0;
+const EVENTS = [];
+function log(type, data) { EVENTS.push(Object.assign({ t: +simTime.toFixed(3), type }, data)); if (EVENTS.length > 4000) EVENTS.shift(); }
+
+/* ================================ audio ================================ */
+const AU = { ctx: null };
+function audioInit() {
+  if (AU.ctx) { if (AU.ctx.state === 'suspended') AU.ctx.resume(); return; }
+  const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
+  try {
+    const ctx = new C(); AU.ctx = ctx;
+    AU.master = ctx.createGain(); AU.master.gain.value = muted ? 0 : 0.85;
+    const comp = ctx.createDynamicsCompressor(); AU.master.connect(comp); comp.connect(ctx.destination);
+    const len = ctx.sampleRate * 2, buf = ctx.createBuffer(1, len, ctx.sampleRate), d = buf.getChannelData(0); for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1; AU.noise = buf;
+    const lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 300; lp.Q.value = 0.8;
+    const eg = ctx.createGain(); eg.gain.value = 0; lp.connect(eg); eg.connect(AU.master);
+    const osc = [['sawtooth', 44], ['sawtooth', 66.3], ['triangle', 22]].map(([type, f]) => { const o = ctx.createOscillator(); o.type = type; o.frequency.value = f; o.connect(lp); o.start(); return o; });
+    const ns = ctx.createBufferSource(); ns.buffer = buf; ns.loop = true; const nb = ctx.createBiquadFilter(); nb.type = 'bandpass'; nb.frequency.value = 500; nb.Q.value = 0.6; const ng = ctx.createGain(); ng.gain.value = 0; ns.connect(nb); nb.connect(ng); ng.connect(AU.master); ns.start();
+    AU.eng = { lp, eg, osc, nb, ng };
+  } catch (e) { AU.ctx = null; }
+}
+function voice(fn) { if (!AU.ctx || muted) return; try { fn(AU.ctx, AU.ctx.currentTime); } catch (e) {} }
+function panned(ctx, pan) { const g = ctx.createGain(); if (ctx.createStereoPanner) { const p = ctx.createStereoPanner(); p.pan.value = clamp(pan, -1, 1); g.connect(p); p.connect(AU.master); } else g.connect(AU.master); return g; }
+const sfx = {
+  whoosh: (pan, k) => voice((ctx, t) => {
+    const s = ctx.createBufferSource(); s.buffer = AU.noise; const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 1.3;
+    f.frequency.setValueAtTime(2600 + k * 1800, t); f.frequency.exponentialRampToValueAtTime(380, t + 0.7);
+    const g = panned(ctx, pan * 0.85); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25 + k * 0.5, t + 0.09); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.85);
+    s.connect(f); f.connect(g); s.start(t); s.stop(t + 0.9);
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(520 + k * 300, t); o.frequency.exponentialRampToValueAtTime(140, t + 0.6); const og = panned(ctx, pan * 0.6); og.gain.setValueAtTime(0.0001, t); og.gain.exponentialRampToValueAtTime(0.05 + k * 0.08, t + 0.05); og.gain.exponentialRampToValueAtTime(0.0001, t + 0.65); o.connect(og); o.start(t); o.stop(t + 0.7);
+  }),
+  thud: (k) => voice((ctx, t) => {
+    const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.setValueAtTime(120, t); o.frequency.exponentialRampToValueAtTime(38, t + 0.4); const g = panned(ctx, 0); g.gain.setValueAtTime(0.5 * k + 0.2, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.5); o.connect(g); o.start(t); o.stop(t + 0.55);
+    const s = ctx.createBufferSource(); s.buffer = AU.noise; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 1400; const g2 = panned(ctx, 0); g2.gain.setValueAtTime(0.35 * k + 0.1, t); g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.35); s.connect(f); f.connect(g2); s.start(t); s.stop(t + 0.4);
+  }),
+  pew: (pan) => voice((ctx, t) => { const o = ctx.createOscillator(); o.type = 'square'; o.frequency.setValueAtTime(1500, t); o.frequency.exponentialRampToValueAtTime(260, t + 0.09); const g = panned(ctx, pan); g.gain.setValueAtTime(0.045, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.1); o.connect(g); o.start(t); o.stop(t + 0.12); }),
+  chip: () => voice((ctx, t) => { const s = ctx.createBufferSource(); s.buffer = AU.noise; const f = ctx.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 1800; const g = panned(ctx, 0); g.gain.setValueAtTime(0.08, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.12); s.connect(f); f.connect(g); s.start(t); s.stop(t + 0.15); }),
+  boost: () => voice((ctx, t) => { const s = ctx.createBufferSource(); s.buffer = AU.noise; const f = ctx.createBiquadFilter(); f.type = 'bandpass'; f.Q.value = 0.8; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(2200, t + 0.5); const g = panned(ctx, 0); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.22, t + 0.12); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7); s.connect(f); f.connect(g); s.start(t); s.stop(t + 0.75); }),
+  blip: () => voice((ctx, t) => { [880, 1320].forEach((fr, i) => { const o = ctx.createOscillator(); o.type = 'sine'; o.frequency.value = fr; const g = panned(ctx, -0.3); g.gain.setValueAtTime(0.0001, t + i * 0.07); g.gain.exponentialRampToValueAtTime(0.05, t + i * 0.07 + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + i * 0.07 + 0.08); o.connect(g); o.start(t + i * 0.07); o.stop(t + i * 0.07 + 0.1); }); }),
+  boom: () => voice((ctx, t) => { const s = ctx.createBufferSource(); s.buffer = AU.noise; const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(2400, t); f.frequency.exponentialRampToValueAtTime(90, t + 1.8); const g = panned(ctx, 0); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 2); s.connect(f); f.connect(g); s.start(t); s.stop(t + 2.1); }),
+};
+function audioUpdate(dt) {
+  if (!AU.ctx || !AU.eng) return;
+  const t = AU.ctx.currentTime, e = AU.eng, s = player.vel.length(), on = mode === 'fly' && !paused && player.alive ? 1 : mode === 'title' ? 0.45 : 0.15;
+  e.osc[0].frequency.setTargetAtTime(38 + s * 0.3, t, 0.2); e.osc[1].frequency.setTargetAtTime(57 + s * 0.45, t, 0.2); e.osc[2].frequency.setTargetAtTime(19 + s * 0.15, t, 0.2);
+  e.lp.frequency.setTargetAtTime(160 + s * 6 + player.boostVis * 900, t, 0.12);
+  e.eg.gain.setTargetAtTime((0.05 + player.thrust * 0.07) * on, t, 0.15);
+  e.nb.frequency.setTargetAtTime(350 + s * 10, t, 0.2); e.ng.gain.setTargetAtTime((0.006 + player.boostVis * 0.05) * on, t, 0.15);
+  AU.master.gain.setTargetAtTime(muted ? 0 : 0.85, t, 0.05);
+}
+
+/* ================================ radio ================================ */
+const RADIO = {
+  launch: ['On your right wing, Lead. Rocks ahead, all on your left.'],
+  first: ['Ha! That\'s how you thread a rock.'],
+  close: ['You scraped paint off that one.', 'Close enough to count the pebbles.', 'Show-off.', 'I felt that from here.'],
+  streak: ['Four in a row. Save some rocks for me.', 'You\'re on a roll, Lead.'],
+  hit: ['Easy! Check your hull.', 'That one hit back.', 'Rocks don\'t move, Lead.'],
+  low: ['Hull\'s hurting. Take it gentle for a while.'],
+  breach: ['Lead\'s down! Taking us back to the start line.'],
+  reset: ['Back on the start line. Ready when you are.'],
+  far: ['Slow down, Lead, I\'m losing you.', 'Wait up!'],
+  quiet: ['Plenty of rock out here. Get closer.', 'We came here to fly, not sightsee.'],
+  vegaClose: ['Whoa. That one nearly had me.', 'Just trimmed a rock. Totally meant that.'],
+  vegaHit: ['Ow. Paint job\'s ruined.'],
+};
+const radio = { t: -99, until: -99, last: {}, text: '', shown: 0 };
+function say(key, force) {
+  const lines = RADIO[key]; if (!lines) return;
+  if (!force && clock - radio.t < 6) return;
+  if (!force && radio.last[key] && clock - radio.last[key] < 20) return;
+  const n = (radio.last[key + '#'] || 0); radio.last[key + '#'] = n + 1; radio.last[key] = clock;
+  radio.text = lines[n % lines.length]; radio.t = clock; radio.until = clock + 4.8; radio.shown = 0;
+  sfx.blip(); log('radio', { key, text: radio.text });
+}
+
+/* ================================ flight events ================================ */
+const enc = new Map();                               // rock index -> the pass in progress
+const popup = { t: -99, a: '', b: '' };
+const fx = { shake: 0, punch: 0, flashL: 0, flashR: 0, dmg: 0 };
+function closePass(e) {
+  const k = clamp((PASS - e.min) / PASS, 0, 1);
+  run.streak = simTime - run.lastPass < 5 ? run.streak + 1 : 1; run.lastPass = simTime;
+  const mult = Math.min(4, 1 + (run.streak - 1) * 0.5);
+  const pts = Math.round(((60 + 440 * k ** 1.5) * (e.speed / FM.cruise) * mult) / 10) * 10;
+  run.score += pts; run.passes++; run.closest = Math.min(run.closest, e.min);
+  if (run.score > best) { best = run.score; store.set('astra-best', String(best)); }
+  popup.t = clock; popup.a = e.part === 'wingtip' ? 'WINGTIP PASS' : e.min < 1.5 ? 'KNIFE EDGE' : 'CLOSE PASS';
+  popup.b = `${e.min.toFixed(1)} m  ·  +${pts}${mult > 1 ? `  ×${mult}` : ''}`;
+  fx.shake = Math.max(fx.shake, 0.25 + k * 0.7); fx.punch = Math.max(fx.punch, 2 + k * 5);
+  if (e.side < 0) fx.flashL = 0.55 + k * 0.45; else if (e.side > 0) fx.flashR = 0.55 + k * 0.45; else { fx.flashL = fx.flashR = 0.4 + k * 0.4; }
+  if (k > 0.82) hitStop = 0.32;                      // a knife-edge pass hangs for a beat
+  sfx.whoosh(e.side, k);
+  dust.emit(e.at, player.vel.clone().multiplyScalar(0.25), 1, 6, 10 + Math.round(k * 16), 1.6, null, fxr);
+  log('pass', { gap: +e.min.toFixed(2), k: +k.toFixed(3), side: e.side, part: e.part, pts, streak: run.streak });
+  if (run.passes === 1) say('first', true); else if (run.streak === 4) say('streak'); else if (e.min < 1.6) say('close');
+}
+function onHit(ship, impact, at, n) {
+  if (ship === player) {
+    run.hits++; fx.shake = Math.max(fx.shake, 0.6 + Math.min(1.2, impact / 25)); fx.dmg = 1; sfx.thud(Math.min(1, impact / 30));
+    sparks.emit(at, n.clone().multiplyScalar(8).add(ship.vel.clone().multiplyScalar(0.3)), 1.2, 22, 40, 0.6, null, fxr);
+    dust.emit(at, n.clone().multiplyScalar(4), 1, 7, 14, 1.8, null, fxr);
+    log('hit', { impact: +impact.toFixed(1), hull: +ship.hull.toFixed(0) });
+    if (ship.hull <= 0) breach(); else if (ship.hull < 35) say('low'); else say('hit');
+  } else { sparks.emit(at, n.clone().multiplyScalar(8), 1.2, 18, 24, 0.5, null, fxr); say('vegaHit'); log('vegaHit', { impact: +impact.toFixed(1) }); }
+}
+function breach() {
+  if (mode !== 'fly') return;
+  player.alive = false; player.g.visible = false; mode = 'breach'; breachT = 0;
+  sparks.emit(player.pos, player.vel.clone().multiplyScalar(0.4), 1.4, 40, 260, 1.2, null, fxr);
+  dust.emit(player.pos, player.vel.clone().multiplyScalar(0.3), 1, 16, 120, 2.6, null, fxr);
+  fx.shake = 1.6; sfx.boom(); say('breach', true); log('breach', {});
+  $('ovBreach').hidden = false;
+}
+const hp = V3(), hn = V3();
+function collide(ship, isPlayer) {
+  const vis = ship.qv;
+  for (let i = 0; i < ROCKS.length; i++) {
+    const R = ROCKS[i], dx = ship.pos.x - R.c.x, dy = ship.pos.y - R.c.y, dz = ship.pos.z - R.c.z, reach = R.reach + 8 + PASS;
+    if (dx * dx + dy * dy + dz * dz > reach * reach) { if (isPlayer && enc.has(i)) finishEnc(i); continue; }
+    let best = Infinity, bs = null;
+    for (const S of SAMPLES) {
+      hp.copy(S.p).applyQuaternion(vis).add(ship.pos);
+      const gap = gapTo(R, hp) - S.r;
+      if (gap < best) { best = gap; bs = S; hn.copy(hp); }
+    }
+    if (best < 0) {
+      const n = V3().subVectors(hn, R.c).normalize();
+      ship.pos.addScaledVector(n, -best + 0.02);
+      const vn = ship.vel.dot(n);
+      if (vn < 0) {
+        const impact = -vn; ship.vel.addScaledVector(n, -1.35 * vn); const vt = ship.vel.clone().addScaledVector(n, -ship.vel.dot(n)); ship.vel.addScaledVector(vt, -0.12);
+        ship.ang.x += (fxr() - 0.5) * impact * 0.03; ship.ang.y += (fxr() - 0.5) * impact * 0.03; ship.ang.z += (fxr() - 0.5) * impact * 0.05;
+        if (impact > 2.5 && ship.hitCd <= 0) { ship.hitCd = 0.3; ship.hull = Math.max(0, ship.hull - clamp(impact * 0.85, 4, 50) * (isPlayer ? 1 : 0.35)); onHit(ship, impact, hn.clone(), n); }
+      }
+    }
+    if (isPlayer) trackEnc(i, R, best, bs);
+    else if (best < 2.5 && best > 0 && (!R.vegaT || simTime - R.vegaT > 6)) { R.vegaT = simTime; if (clock - radio.t > 12) say('vegaClose'); }
+  }
+}
+function trackEnc(i, R, gap, S) {
+  let e = enc.get(i);
+  if (gap < PASS) {
+    if (!e) { e = { min: Infinity, part: 'hull', side: 0, hit: false, fired: false, t0: simTime, speed: 0, at: V3() }; enc.set(i, e); }
+    if (gap < 0) e.hit = true;
+    if (gap < e.min) {
+      e.min = gap; e.part = S.part; e.speed = player.vel.length(); e.at.copy(hn);
+      const { r, u } = player.axes(), rel = V3().subVectors(R.c, player.pos); const x = rel.dot(r), y = rel.dot(u);
+      e.side = Math.abs(x) > Math.abs(y) * 0.8 ? Math.sign(x) : 0;
+    } else if (!e.fired && !e.hit && gap > e.min + 0.35 && e.speed > 15) { e.fired = true; closePass(e); }
+  } else if (e) finishEnc(i);
+}
+function finishEnc(i) { const e = enc.get(i); enc.delete(i); if (e && !e.fired && !e.hit && e.min < PASS && e.speed > 15) closePass(e); }
+
+/* ================================ the wingman ================================ */
+// Vega holds a slot off your right wing. She follows a critically damped path towards it (or, when she has
+// been thrown well off it, towards a point ahead of you on your own path), limited to what a Jupiter can do:
+// top speed, 70 m/s² of thrust and a turn-rate cap. Her ship turns to face where she is going, banks into her
+// acceleration, and she looks 3 s down her path to swing wide of rock.
+const SLOT = V3(17, 2.5, -3);
+const aiV = { slot: V3(), sv: V3(), om: V3(), vd: V3(), d: V3(), cl: V3(), tmp: V3(), a: V3(), m: new T.Matrix4(), q: new T.Quaternion(), up: V3(), f: V3(), r: V3() };
+const aiDbg = {};
+function wingAI(w, lead, h) {
+  const A = aiV;
+  A.sv.copy(SLOT).applyQuaternion(lead.q);                                        // slot offset in world axes
+  A.om.copy(lead.ang).applyQuaternion(lead.q);                                    // lead's spin in world axes
+  A.slot.copy(A.sv).add(lead.pos);
+  A.sv.crossVectors(A.om, A.sv).add(lead.vel);                                    // how fast the slot itself is moving
+  for (const R of ROCKS) { const dd = A.slot.distanceTo(R.c), need = R.reach + 10; if (dd < need) A.slot.addScaledVector(A.d.subVectors(A.slot, R.c).normalize(), need - dd); }
+  const off = w.pos.distanceTo(A.slot);
+  if (off > 45) w.rejoin = true; else if (off < 25) w.rejoin = false;
+  if (!w.rejoin) A.vd.copy(A.sv).addScaledVector(A.d.subVectors(A.slot, w.pos), 1.1);
+  else { const P = A.tmp.copy(lead.pos).addScaledVector(lead.vel, clamp(off / 60, 0.4, 2.5)), rel = A.d.subVectors(P, w.pos), L = rel.length(); A.vd.copy(lead.vel).addScaledVector(rel, Math.min(L * 0.8, 55) / Math.max(L, 1e-3)); }
+  const sp = Math.max(12, w.vel.length()), look = 3; let avoiding = false, urgent = false;
+  for (const R of ROCKS) {
+    A.d.subVectors(R.c, w.pos); const t = A.d.dot(w.vel) / (sp * sp); if (t < 0 || t > look) continue;
+    A.cl.copy(w.vel).multiplyScalar(t).sub(A.d); const miss = A.cl.length(), need = R.reach + 9;   // rock centre -> passing point
+    if (miss < need) { if (miss < 0.5) A.cl.copy(AX).applyQuaternion(w.q); A.cl.normalize(); A.vd.addScaledVector(A.cl, ((need - miss) / need) * (1.25 - t / look) * sp * 1.5); avoiding = true; if (t < 1.2 && miss < need * 0.7) urgent = true; }
+  }
+  A.d.subVectors(w.pos, lead.pos); const sep = A.d.length(); if (sep < 13) A.vd.addScaledVector(A.d.normalize(), (13 - sep) * 3);
+  if (urgent) A.vd.clampLength(0, Math.max(30, w.vel.length() * 0.7));
+  A.vd.clampLength(0, FM.boost * 1.05);
+  // Thrust towards the velocity she wants, within her ship's limits.
+  A.a.subVectors(A.vd, w.vel).multiplyScalar(2.6).clampLength(0, 70);
+  w.vel.addScaledVector(A.a, h).clampLength(0, FM.boost * 1.08);
+  w.pos.addScaledVector(w.vel, h);
+  // Face where she is going, nose leading into the turn a touch, level with you, turn rate capped.
+  const v = w.vel.length();
+  if (v > 2) {
+    A.f.copy(w.vel).addScaledVector(A.a, 0.3).normalize();
+    A.up.set(0, 1, 0).applyQuaternion(lead.q);
+    A.m.lookAt(A.tmp.set(0, 0, 0), A.f, A.up); A.q.setFromRotationMatrix(A.m);
+    const before = w.q.clone(); w.q.rotateTowards(A.q, 1.7 * h);
+    const dq = before.invert().multiply(w.q); const ang = 2 * Math.acos(clamp(dq.w, -1, 1)) / Math.max(h, 1e-4);
+    w.ang.set(0, 0, 0); if (ang > 1e-3) { const s2 = Math.sqrt(Math.max(1e-9, 1 - dq.w * dq.w)); w.ang.set(dq.x / s2 * ang, dq.y / s2 * ang, dq.z / s2 * ang); }
+  }
+  A.r.set(1, 0, 0).applyQuaternion(w.q);
+  w.bank = approach(w.bank, clamp(A.a.dot(A.r) * 0.03, -1.1, 1.1), 0.25, h);
+  w.qv.copy(w.q).multiply(A.q.setFromAxisAngle(AF, w.bank));
+  const fw = A.f.set(0, 0, -1).applyQuaternion(w.q);
+  w.boosting = v > FM.cruise * 1.45; w.boostVis = approach(w.boostVis, w.boosting ? 1 : 0, 0.35, h);
+  w.thrust = approach(w.thrust, clamp(0.3 + Math.max(0, A.a.dot(fw)) / 45 + (v - FM.cruise) / 120, 0.25, 1), 0.15, h);
+  w.hitCd -= h;
+  Object.assign(aiDbg, { off, rejoin: !!w.rejoin, avoid: avoiding, urgent, spd: A.vd.length() });
+}
+
+/* ================================ input ================================ */
+const keys = new Set();
+const touch = { x: 0, y: 0, boost: false, left: false, right: false, fire: false, used: false };
+function readInput() {
+  let pitch = (keys.has('ArrowUp') ? 1 : 0) - (keys.has('ArrowDown') ? 1 : 0), yaw = (keys.has('ArrowRight') ? 1 : 0) - (keys.has('ArrowLeft') ? 1 : 0);
+  let strafe = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
+  if (touch.used) { pitch += -touch.y; yaw += touch.x; strafe += (touch.right ? 1 : 0) - (touch.left ? 1 : 0); }
+  if (inverted) pitch = -pitch;
+  return { pitch: clamp(pitch, -1, 1), yaw: clamp(yaw, -1, 1), strafe: clamp(strafe, -1, 1), boost: keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.boost, fire: keys.has('Space') || touch.fire };
+}
+const GAME_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
+window.addEventListener('keydown', (e) => {
+  if (GAME_KEYS.includes(e.code) && mode !== 'title') e.preventDefault();
+  keys.add(e.code); audioInit();
+  if (e.repeat) return;
+  if (e.code === 'Enter' && mode === 'title') { e.preventDefault(); launch(); }
+  else if (e.code === 'KeyP' || e.code === 'Escape') togglePause();
+  else if (e.code === 'KeyR' && mode !== 'title') resetFlight(true);
+  else if (e.code === 'KeyI') toggleInvert();
+  else if (e.code === 'KeyM') toggleMute();
+  else if (e.code === 'KeyC') { cam.yaw = cam.pitch = 0; }
+});
+window.addEventListener('keyup', (e) => keys.delete(e.code));
+window.addEventListener('blur', () => { keys.clear(); cam.dragging = false; if (mode === 'fly' && !paused && !MANUAL) togglePause(); });
+document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'fly' && !paused && !MANUAL) togglePause(); });
+
+// Camera drag: grab the view and swing it round the ship. The ship keeps flying where it was pointed.
+const cam = { q: new T.Quaternion(), yaw: 0, pitch: 0, dragging: false, idle: 9, id: null, lx: 0, ly: 0, fov: 62, lag: V3(), prevVel: V3(), acc: V3(), orbit: 0 };
+const view = $('view');
+view.addEventListener('pointerdown', (e) => {
+  audioInit(); if (e.pointerType === 'mouse' && e.button !== 0) return;
+  cam.dragging = true; cam.id = e.pointerId; cam.lx = e.clientX; cam.ly = e.clientY; view.classList.add('drag'); try { view.setPointerCapture(e.pointerId); } catch (x) {}
+});
+view.addEventListener('pointermove', (e) => {
+  if (!cam.dragging || e.pointerId !== cam.id) return;
+  const dx = e.clientX - cam.lx, dy = e.clientY - cam.ly; cam.lx = e.clientX; cam.ly = e.clientY;
+  cam.yaw -= dx * 0.0062; cam.pitch = clamp(cam.pitch - dy * 0.005, -1.25, 1.25); cam.idle = 0;
+});
+const endDrag = (e) => { if (e.pointerId !== cam.id) return; cam.dragging = false; cam.id = null; view.classList.remove('drag'); };
+view.addEventListener('pointerup', endDrag); view.addEventListener('pointercancel', endDrag);
+view.addEventListener('dblclick', () => { cam.yaw = cam.pitch = 0; });
+
+// Touch: a stick for steering, held buttons for slide, fire and boost.
+(function touchControls() {
+  const stick = $('stick'), knob = $('knob'); let sid = null;
+  const setStick = (e) => { const r = stick.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2; let x = (e.clientX - cx) / (r.width / 2), y = (e.clientY - cy) / (r.height / 2); const l = Math.hypot(x, y); if (l > 1) { x /= l; y /= l; } touch.x = x; touch.y = y; knob.style.transform = `translate(${x * 40}px, ${y * 40}px)`; };
+  stick.addEventListener('pointerdown', (e) => { audioInit(); touch.used = true; sid = e.pointerId; try { stick.setPointerCapture(sid); } catch (x) {} setStick(e); });
+  stick.addEventListener('pointermove', (e) => { if (e.pointerId === sid) setStick(e); });
+  const up = (e) => { if (e.pointerId !== sid) return; sid = null; touch.x = touch.y = 0; knob.style.transform = ''; };
+  stick.addEventListener('pointerup', up); stick.addEventListener('pointercancel', up);
+  for (const [id, k] of [['tBoost', 'boost'], ['tLeft', 'left'], ['tRight', 'right'], ['tFire', 'fire']]) {
+    const b = $(id); b.addEventListener('pointerdown', (e) => { audioInit(); touch.used = true; touch[k] = true; try { b.setPointerCapture(e.pointerId); } catch (x) {} });
+    const off = () => { touch[k] = false; }; b.addEventListener('pointerup', off); b.addEventListener('pointercancel', off); b.addEventListener('lostpointercapture', off);
+  }
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  window.addEventListener('touchstart', () => { if (!document.body.classList.contains('touching')) { document.body.classList.add('touching'); if (mode !== 'title') $('touch').hidden = false; } }, { passive: true });
+  if (coarse) document.body.classList.add('touching');
+})();
+
+/* ================================ flow ================================ */
+function spawnQ() { return new T.Quaternion(); }
+function resetFlight(announce) {
+  player.reset(START.lead, spawnQ(), mode === 'title' ? 0 : 18);
+  wing.reset(START.vega, spawnQ(), mode === 'title' ? 0 : 18);
+  enc.clear(); sparks.clear(); dust.clear(); bolts.forEach((b) => { b.life = 0; b.m.visible = false; });
+  Object.assign(run, { score: 0, passes: 0, streak: 0, lastPass: -99, closest: Infinity, hits: 0 });
+  cam.q.copy(player.q); cam.yaw = cam.pitch = 0; cam.lag.set(0, 0, 0); cam.prevVel.copy(player.vel); hitStop = 0; timeScale = 1;
+  // put every rock back where it started, so a reset really is the same start line
+  ROCKS.forEach((R) => { R.c.copy(R.c0); });
+  updateRocks(0, player.pos);
+  if (announce) { log('reset', {}); toast('Flight reset'); say('reset', true); }
+}
+function launch() {
+  if (mode !== 'title') return;
+  audioInit(); mode = 'fly'; paused = false;
+  $('ovTitle').hidden = true; $('hud').hidden = false; ['reticle', 'fpm', 'wing'].forEach((id) => { $(id).hidden = false; });
+  if (document.body.classList.contains('touching')) $('touch').hidden = false;
+  resetFlight(false); log('launch', {}); launchT = clock;
+  view.focus({ preventScroll: true });
+}
+let launchT = -99;
+function togglePause() {
+  if (mode === 'title') return;
+  paused = !paused; $('ovPause').hidden = !paused; $('btnPause').textContent = paused ? 'RESUME' : 'PAUSE';
+  keys.clear(); log(paused ? 'pause' : 'resume', {});
+  if (!paused) view.focus({ preventScroll: true });
+}
+function syncToggles() {
+  for (const id of ['bInv', 'bInvT']) { $(id).textContent = `Inverted pitch: ${inverted ? 'on' : 'off'}`; $(id).setAttribute('aria-pressed', String(inverted)); }
+  $('bMute').textContent = `Sound: ${muted ? 'off' : 'on'}`; $('bMute').setAttribute('aria-pressed', String(!muted));
+  $('kPitch').textContent = inverted ? 'Pitch (inverted)' : 'Pitch';
+}
+function toggleInvert() { inverted = !inverted; store.set('astra-invert', inverted ? '1' : '0'); syncToggles(); toast(inverted ? 'Inverted pitch on: ↑ drops the nose' : 'Inverted pitch off: ↑ lifts the nose'); log('invert', { on: inverted }); }
+function toggleMute() { muted = !muted; store.set('astra-mute', muted ? '1' : '0'); syncToggles(); audioInit(); }
+let toastUntil = -99;
+function toast(msg) { $('toast').textContent = msg; $('toast').classList.add('on'); toastUntil = clock + 2.2; }
+$('bLaunch').onclick = () => launch();
+$('bResume').onclick = () => togglePause();
+$('bReset').onclick = () => { resetFlight(true); if (paused) togglePause(); };
+$('bInv').onclick = () => toggleInvert(); $('bInvT').onclick = () => toggleInvert();
+$('bMute').onclick = () => toggleMute();
+$('btnPause').onclick = () => togglePause();
+syncToggles();
+
+/* ================================ simulation ================================ */
+function stepSim(h) {
+  simTime += h;
+  if (mode === 'fly' && player.alive) {
+    player.inp = readInput(); player.update(h);
+    if (player.inp.fire) fireGuns(player);
+    collide(player, true);
+  }
+  wingAI(wing, player, h); collide(wing, false);
+  const sep = V3().subVectors(wing.pos, player.pos), sl = sep.length();
+  if (sl < 7.5 && player.alive) { sep.normalize(); wing.pos.addScaledVector(sep, 7.5 - sl); wing.vel.addScaledVector(sep, 4); }
+  updateBolts(h);
+}
+function simulate(dt) {
+  const n = Math.max(1, Math.ceil(dt / (1 / 120))), h = dt / n;
+  for (let i = 0; i < n; i++) stepSim(h);
+  sparks.update(dt, camera.position); dust.update(dt, camera.position);
+  if (mode === 'fly' && player.alive) {
+    if (player.boosting && !player._wasBoost) { sfx.boost(); log('boostOn', {}); }
+    if (!player.boosting && player._wasBoost) log('boostOff', {});
+    player._wasBoost = player.boosting;
+    if (simTime - run.lastPass > 45 && clock - launchT > 45) say('quiet');
+    if (wing.pos.distanceTo(player.pos) > 160) say('far');
+    if (clock - launchT > 1.4 && clock - launchT < 1.6 && !radio.last.launch) say('launch', true);
+  }
+}
+
+/* ================================ camera ================================ */
+const cv = { off: V3(), f: V3(), u: V3(), r: V3(), tgt: V3(), oq: new T.Quaternion(), e: new T.Euler(0, 0, 0, 'YXZ'), shake: V3() };
+function updateCamera(dt, simDt) {
+  const s = player;
+  if (mode === 'title') {                            // a slow walk-round of both ships
+    const a = clock * 0.14 + 0.9, R = 40;
+    camera.position.set(s.pos.x + 7 + Math.sin(a) * R, s.pos.y + 9 + Math.sin(clock * 0.3) * 2, s.pos.z + 4 + Math.cos(a) * R);
+    camera.up.set(0, 1, 0);
+    const wide = window.innerWidth > 820;
+    cv.tgt.set(s.pos.x + 7, s.pos.y, s.pos.z + 4); camera.lookAt(cv.tgt);
+    if (wide) { cv.r.set(1, 0, 0).applyQuaternion(camera.quaternion); cv.tgt.addScaledVector(cv.r, -15); camera.lookAt(cv.tgt); }
+    camera.fov = 50; camera.updateProjectionMatrix(); return;
+  }
+  // The camera trails the ship's rotation: turn, and for a moment you see her side before it catches up.
+  cam.q.slerp(s.q, 1 - Math.exp(-dt * 4.2));
+  if (!cam.dragging && !paused) { cam.idle += dt; if (cam.idle > 0.9) { cam.yaw = approach(cam.yaw, 0, 0.45, dt); cam.pitch = approach(cam.pitch, 0, 0.45, dt); } }
+  const orbit = clamp((Math.abs(cam.yaw) + Math.abs(cam.pitch)) / 0.6, 0, 1); cam.orbit = orbit;
+  // Acceleration shoves the camera: a boost pulls it back, a hit knocks it.
+  if (simDt > 0) { cam.acc.subVectors(s.vel, cam.prevVel).divideScalar(simDt); cam.prevVel.copy(s.vel); }
+  const accLocal = cam.acc.clone().applyQuaternion(cv.oq.copy(cam.q).invert()).multiplyScalar(-0.012);
+  accLocal.clampLength(0, 2.2); cam.lag.lerp(accLocal, 1 - Math.exp(-dt * 3));
+  const portrait = Math.max(0, 1 - camera.aspect);                              // 0 on a landscape screen
+  cv.off.set(0, 5.0 + s.boostVis * 0.6, (25 + s.boostVis * 4.5) * (1 + portrait * 0.7)).add(cam.lag);
+  cv.oq.setFromEuler(cv.e.set(cam.pitch, cam.yaw, 0, 'YXZ'));
+  cv.off.applyQuaternion(cv.oq).applyQuaternion(cam.q);
+  const sh = fx.shake * fx.shake;
+  cv.shake.set(Math.sin(clock * 41) * 0.6 + Math.sin(clock * 67 + 1) * 0.4, Math.sin(clock * 37 + 2) * 0.6 + Math.sin(clock * 73) * 0.4, 0).multiplyScalar(sh * 0.42);
+  camera.position.copy(s.pos).add(cv.off);
+  cv.f.set(0, 0, -1).applyQuaternion(cam.q); cv.u.set(0, 1, 0).applyQuaternion(cam.q);
+  cv.tgt.copy(s.pos).addScaledVector(cv.f, 30 * (1 - orbit)).addScaledVector(cv.u, 2.4 * (1 - orbit));
+  camera.up.copy(cv.u).applyAxisAngle(cv.f, s.bank * 0.28 * (1 - orbit));
+  camera.lookAt(cv.tgt);
+  cv.r.set(1, 0, 0).applyQuaternion(camera.quaternion); const cu = V3(0, 1, 0).applyQuaternion(camera.quaternion);
+  camera.position.addScaledVector(cv.r, cv.shake.x).addScaledVector(cu, cv.shake.y);
+  cam.fov = approach(cam.fov, 62 + portrait * 22 + s.boostVis * 13 + fx.punch, 0.18, dt);
+  camera.fov = cam.fov; camera.updateProjectionMatrix();
+}
+
+/* ================================ per-frame visuals ================================ */
+function shipVisuals(s, dt) {
+  s.g.position.copy(s.pos); s.g.quaternion.copy(s.qv);
+  const flick = 1 + Math.sin(clock * 43 + s.pos.x) * 0.06 + Math.sin(clock * 71) * 0.04;
+  s.flames.forEach((F, i) => {
+    const len = (1.1 + s.thrust * 2.2 + s.boostVis * 3.2) * flick * (i === 0 ? 1.1 : 1), r = F.r * (0.8 + s.thrust * 0.35);
+    F.outer.scale.set(r, r, len); F.inner.scale.set(r * 0.55, r * 0.55, len * 0.62);
+    F.outer.material.opacity = 0.32 + s.thrust * 0.3; F.inner.material.opacity = 0.55 + s.thrust * 0.35;
+    const gs = (1.1 + s.thrust * 1.0 + s.boostVis * 1.5) * F.r * 2; s.glows[i].scale.set(gs, gs, 1);
+  });
+  s.light.intensity = 0.22 + s.thrust * 0.4 + s.boostVis * 0.55;
+  s.beacon.visible = (clock % 1.3) < 0.1;
+  s.muzzles.forEach((m, i) => { s.flash[i] = Math.max(0, s.flash[i] - dt); m.visible = s.flash[i] > 0; });
+  if (!paused && s.alive) s.trails.forEach((t, i) => t.push(s.world(ENGINE_POS[i], V3())));
+  s.trails.forEach((t) => t.update(camera.position, (s.alive ? 0.1 + s.thrust * 0.12 + s.boostVis * 0.22 : 0.06) * (s.trailGain ?? 1)));   // additive + sRGB: small numbers read bright
+}
+const scr = V3();
+function toScreen(p, W, H) { scr.copy(p).applyMatrix4(camera.matrixWorldInverse); if (scr.z > -0.1) return null; scr.copy(p).project(camera); return [(scr.x * 0.5 + 0.5) * W, (-scr.y * 0.5 + 0.5) * H]; }
+const txt = {};
+const setT = (id, v) => { if (txt[id] !== v) { txt[id] = v; $(id).textContent = v; } };
+function hud(dt) {
+  const W = window.innerWidth, H = window.innerHeight, s = player;
+  fx.shake = Math.max(0, fx.shake - dt * 1.6); fx.punch = approach(fx.punch, 0, 0.25, dt);
+  fx.flashL = Math.max(0, fx.flashL - dt * 1.8); fx.flashR = Math.max(0, fx.flashR - dt * 1.8); fx.dmg = Math.max(0, fx.dmg - dt * 1.5);
+  $('flashL').style.opacity = fx.flashL.toFixed(3); $('flashR').style.opacity = fx.flashR.toFixed(3); $('dmg').style.opacity = fx.dmg.toFixed(3);
+  if (toastUntil < clock) $('toast').classList.remove('on');
+  if (mode === 'title') return;
+  // instruments
+  setT('hSpeed', String(Math.round(s.vel.length())));
+  $('hBoost').style.transform = `scaleX(${s.boostE.toFixed(3)})`; setT('hBoostTxt', s.boostLock ? 'recharging' : `${Math.round(s.boostE * 100)}%`);
+  $('hHull').style.transform = `scaleX(${(s.hull / 100).toFixed(3)})`; setT('hHullTxt', `${Math.round(s.hull)}%`); $('hHullBar').classList.toggle('low', s.hull < 35);
+  $('inst').classList.toggle('boosting', s.boosting);
+  setT('hScore', String(run.score).padStart(6, '0'));
+  setT('hStreak', `×${Math.max(1, simTime - run.lastPass < 5 ? run.streak : 1)}`);
+  setT('hClosest', isFinite(run.closest) ? `${run.closest.toFixed(1)} m` : '—');
+  // marks
+  const show = (id, p) => { const el = $(id); if (!p) { el.style.visibility = 'hidden'; return; } el.style.visibility = 'visible'; el.style.transform = `translate(${p[0].toFixed(1)}px, ${p[1].toFixed(1)}px)`; };
+  const { f } = s.axes();
+  show('reticle', s.alive ? toScreen(V3().copy(s.pos).addScaledVector(f, 320), W, H) : null);
+  const vl = s.vel.length(); show('fpm', s.alive && vl > 3 ? toScreen(V3().copy(s.pos).addScaledVector(s.vel, 320 / vl), W, H) : null);
+  const wp = toScreen(wing.pos, W, H), wd = wing.pos.distanceTo(s.pos);
+  setT('wingDist', `${Math.round(wd)} m`);
+  const inView = wp && wp[0] > 30 && wp[0] < W - 30 && wp[1] > 30 && wp[1] < H - 30;
+  show('wing', inView ? wp : null);
+  const arrow = $('wingArrow');
+  if (inView) arrow.hidden = true;
+  else {
+    arrow.hidden = false; const rel = V3().subVectors(wing.pos, camera.position).applyMatrix4(new T.Matrix4().extractRotation(camera.matrixWorldInverse));
+    let ax = rel.x, ay = -rel.y; const l = Math.hypot(ax, ay) || 1; ax /= l; ay /= l;
+    const m = 44, sx = (W / 2 - m) / Math.max(Math.abs(ax), 1e-3), sy = (H / 2 - m) / Math.max(Math.abs(ay), 1e-3), k = Math.min(sx, sy);
+    arrow.style.transform = `translate(${(W / 2 + ax * k).toFixed(1)}px, ${(H / 2 + ay * k).toFixed(1)}px) rotate(${Math.atan2(ay, ax).toFixed(3)}rad)`;
+  }
+  // popup
+  const pa = clock - popup.t, po = $('popup');
+  if (pa < 1.6) { setT('popA', popup.a); setT('popB', popup.b); const k = pa < 0.12 ? pa / 0.12 : pa > 1.2 ? 1 - (pa - 1.2) / 0.4 : 1; po.style.opacity = k.toFixed(3); po.style.transform = `translate(-50%, -50%) scale(${(1 + Math.max(0, 0.12 - pa) * 2).toFixed(3)})`; }
+  else po.style.opacity = '0';
+  // radio: the line types itself out
+  const r = $('radio');
+  if (clock < radio.until) { r.classList.add('on'); const n = Math.min(radio.text.length, Math.floor((clock - radio.t) * 55)); if (n !== radio.shown) { radio.shown = n; $('radioTxt').textContent = radio.text.slice(0, n); } }
+  else r.classList.remove('on');
+}
+
+/* ================================ frame ================================ */
+function frame(dtReal, draw = true) {
+  const dt = Math.min(Math.max(dtReal, 0), 1 / 20);
+  clock += dt;
+  let simDt = 0;
+  if (mode !== 'title' && !paused) {
+    if (hitStop > 0) { hitStop -= dt; timeScale = approach(timeScale, 0.45, 0.04, dt); } else timeScale = approach(timeScale, 1, 0.18, dt);
+    simDt = dt * timeScale; simulate(simDt);
+    if (mode === 'breach') { breachT += dt; if (breachT > 2.6) { mode = 'fly'; $('ovBreach').hidden = true; resetFlight(false); say('reset', true); } }
+  } else if (mode === 'title') {
+    player.thrust = 0.3; wing.thrust = 0.3; sparks.update(dt, camera.position); dust.update(dt, camera.position);
+  }
+  updateRocks(paused ? 0 : dt, player.pos);
+  shipVisuals(player, dt); shipVisuals(wing, dt);
+  updateCamera(dt, simDt);
+  sky.position.copy(camera.position); stars.forEach((p) => p.position.copy(camera.position));
+  sunSprite.position.copy(camera.position).addScaledVector(SUN_DIR, 5200);
+  updateDust(player, camera.position);
+  audioUpdate(dt);
+  if (draw) renderer.render(scene, camera); else camera.updateMatrixWorld();
+  hud(dt);
+}
+function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+window.addEventListener('resize', resize); resize();
+ROCKS.forEach((R) => { R.c0 = R.c.clone(); });
+resetFlight(false);
+if (!MANUAL) { let last = performance.now(); const loop = (now) => { frame((now - last) / 1000); last = now; requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+
+/* ================================ test hooks ================================ */
+// Used by tools/play.mjs to fly the game with real key presses at a fixed frame rate.
+const vec = (v) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+window.__astra = {
+  step(dt, draw = true) { frame(dt, draw); },
+  state() {
+    const { f, r, u } = player.axes();
+    return { mode, paused, inverted, muted, t: +simTime.toFixed(3), pos: vec(player.pos), vel: vec(player.vel), speed: +player.vel.length().toFixed(2), fwd: vec(f), right: vec(r), up: vec(u),
+      ang: vec(player.ang), bank: +player.bank.toFixed(3), boostE: +player.boostE.toFixed(3), boosting: player.boosting, hull: +player.hull.toFixed(1), alive: player.alive,
+      score: run.score, passes: run.passes, closest: isFinite(run.closest) ? +run.closest.toFixed(2) : null, hits: run.hits, streak: run.streak,
+      camYaw: +cam.yaw.toFixed(3), camPitch: +cam.pitch.toFixed(3), camPos: vec(camera.position), fov: +camera.fov.toFixed(2),
+      wing: { pos: vec(wing.pos), dist: +wing.pos.distanceTo(player.pos).toFixed(1), hull: +wing.hull.toFixed(1) }, events: EVENTS.length };
+  },
+  rocks(maxDist) {                                  // rocks near the player, in the player's frame: x right, y up, z ahead
+    const { f, r, u } = player.axes(), out = [];
+    ROCKS.forEach((R, i) => { const d = V3().subVectors(R.c, player.pos); const L = d.length(); if (L > maxDist) return; out.push({ i, x: +d.dot(r).toFixed(2), y: +d.dot(u).toFixed(2), z: +d.dot(f).toFixed(2), s: +R.s.toFixed(2), reach: +R.reach.toFixed(2), gap: +(gapTo(R, player.pos)).toFixed(2) }); });
+    return out;
+  },
+  events(from = 0) { return EVENTS.slice(from); },
+  vega() { const { f, r, u } = player.axes(), d = V3().subVectors(wing.pos, player.pos); return { ...aiDbg, speed: +wing.vel.length().toFixed(1), boostE: +wing.boostE.toFixed(2), boosting: wing.boosting, rel: [+d.dot(r).toFixed(1), +d.dot(u).toFixed(1), +d.dot(f).toFixed(1)], inp: { ...wing.inp }, ang: [wing.ang.x, wing.ang.y].map((v) => +v.toFixed(2)) }; },
+  info() { let tris = 0; rockMeshes.forEach((m) => { tris += (m.geometry.attributes.position.count / 3) * m.count; }); return { rocks: ROCKS.length, rockTris: tris, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
+};
+})();
+</script>

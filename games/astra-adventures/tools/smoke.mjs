@@ -1,0 +1,12 @@
+import { open } from './harness.mjs';
+const SP = '/tmp/claude-0/-home-user-3D-Game/a8e029d3-2f16-59c3-b012-4582e92c4956/scratchpad';
+const g = await open();
+const t0 = Date.now(); await g.step(30); console.log('30 title frames', Date.now() - t0, 'ms');
+await g.page.screenshot({ path: `${SP}/astra-title.png` });
+await g.page.click('#bLaunch');
+const t1 = Date.now(); await g.step(180); console.log('180 flight frames', Date.now() - t1, 'ms');
+await g.page.screenshot({ path: `${SP}/astra-fly3s.png` });
+console.log(JSON.stringify(await g.state()));
+console.log(JSON.stringify(await g.page.evaluate(() => window.__astra.info())));
+console.log('errors:', g.errors.length ? g.errors.slice(0, 12) : 'none');
+await g.browser.close();
