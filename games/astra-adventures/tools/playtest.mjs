@@ -5,7 +5,7 @@ import { open } from './harness.mjs';
 
 const SP = '/tmp/claude-0/-home-user-3D-Game/a8e029d3-2f16-59c3-b012-4582e92c4956/scratchpad';
 const g = await open();
-const { page, step, state } = g;
+const { page, step, tick, state } = g;
 const results = [];
 const check = (name, ok, detail) => { results.push({ name, ok, detail }); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`); };
 const deg = (r) => (r * 180 / Math.PI).toFixed(1);
@@ -74,7 +74,7 @@ await step(90);
 // ---- camera drag: look around without turning the ship
 s0 = await state();
 await page.mouse.move(640, 360); await page.mouse.down();
-for (let i = 0; i < 20; i++) { await page.mouse.move(640 + i * 16, 360 - i * 3); await step(1); }
+for (let i = 0; i < 20; i++) { await page.mouse.move(640 + i * 16, 360 - i * 3); await tick(1); }
 await step(20); s = await state();
 check('drag swings the camera', Math.abs(s.camYaw) > 1.2, `camera yaw ${deg(s.camYaw)}°, pitch ${deg(s.camPitch)}°`);
 check('drag does not turn the ship', Math.abs(heading(s) - heading(s0)) < 0.01 && Math.abs(s.fwd[1] - s0.fwd[1]) < 0.01, `heading moved ${deg(heading(s) - heading(s0))}°`);
@@ -84,7 +84,7 @@ check('camera eases back behind', Math.abs(s.camYaw) < 0.1, `yaw ${deg(s.camYaw)
 
 // ---- pause freezes the flight; the camera can still be dragged
 await page.keyboard.press('KeyP'); await step(2); s0 = await state();
-await page.mouse.move(300, 640); await page.mouse.down(); for (let i = 0; i < 10; i++) { await page.mouse.move(300 - i * 20, 640); await step(1); } await page.mouse.up();   // drag in the open space around the pause card
+await page.mouse.move(300, 640); await page.mouse.down(); for (let i = 0; i < 10; i++) { await page.mouse.move(300 - i * 20, 640); await tick(1); } await page.mouse.up();   // drag in the open space around the pause card
 await step(90); s = await state();
 check('P pauses', s.paused, `paused=${s.paused}`);
 check('paused flight is frozen', Math.hypot(s.pos[0] - s0.pos[0], s.pos[1] - s0.pos[1], s.pos[2] - s0.pos[2]) < 1e-3 && s.t === s0.t, `moved ${Math.hypot(s.pos[0] - s0.pos[0], s.pos[1] - s0.pos[1], s.pos[2] - s0.pos[2]).toFixed(4)} m in 1.5 s`);
@@ -124,7 +124,7 @@ for (let f = 0; f < 60 * 14 && target; f++) {
   const st = await state();
   const kx = yawErr - (-st.ang[1]) * 0.35, ky = pitchErr - st.ang[0] * 0.35;
   for (const [cond, key] of [[kx > 0.01, 'ArrowRight'], [kx < -0.01, 'ArrowLeft'], [ky > 0.01, 'ArrowUp'], [ky < -0.01, 'ArrowDown']]) await (cond ? page.keyboard.down(key) : page.keyboard.up(key));
-  await step(1);
+  await tick(1);
   const e2 = await events(ev0); hitEv = e2.find((e) => e.type === 'hit'); if (hitEv) break;
 }
 for (const k of ['ArrowRight', 'ArrowLeft', 'ArrowUp', 'ArrowDown']) await page.keyboard.up(k);

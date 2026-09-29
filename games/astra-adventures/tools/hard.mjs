@@ -1,0 +1,30 @@
+// Hard difficulty: the title toggle switches it and rebuilds the field; hard flies faster and opens with
+// the gauntlet; a straight run into it takes hits.   node tools/hard.mjs
+import { open } from './harness.mjs';
+const results = [];
+const check = (name, ok, detail) => { results.push(ok); console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}  ${detail}`); };
+let g = await open();
+let s = await g.state(), info = await g.page.evaluate(() => window.__astra.info());
+check('starts on normal', s.difficulty === 'normal' && info.rocks === 330, `${s.difficulty}, ${info.rocks} rocks`);
+await g.page.click('#bDiffT'); await g.step(2);
+s = await g.state(); info = await g.page.evaluate(() => window.__astra.info());
+check('title toggle switches to hard and rebuilds the field', s.difficulty === 'hard' && info.rocks === 560, `${s.difficulty}, ${info.rocks} rocks`);
+const label = await g.page.evaluate(() => document.getElementById('bDiffT').textContent);
+check('toggle label', label === 'Difficulty: Hard', label);
+await g.browser.close();
+g = await open({ storage: { 'astra-hard': '1' } });
+s = await g.state(); check('remembered across loads', s.difficulty === 'hard', s.difficulty);
+await g.page.keyboard.press('Enter'); await g.step(60 * 3); s = await g.state();
+check('hard cruise speed', Math.abs(s.speed - 56) < 1.5, `${s.speed} m/s`);
+const near = await g.page.evaluate(() => window.__astra.rocks(2800).filter((r) => r.z > 0 && Math.hypot(r.x, r.y) < 60).length);
+check('the gauntlet lines the way out', near >= 10, `${near} rocks within 60 m of the line ahead`);
+const ev0 = s.events; await g.step(60 * 25);
+const ev = await g.page.evaluate((f) => window.__astra.events(f), ev0);
+const passes = ev.filter((e) => e.type === 'pass'), hits = ev.filter((e) => e.type === 'hit');
+check('flying straight through the gauntlet is not free', passes.length + hits.length >= 1, `${passes.length} passes (${passes.map((p) => p.gap + 'm').join(' ')}), ${hits.length} hits, ${ev.filter((e) => e.type === 'breach').length} breaches`);
+await g.page.keyboard.press('KeyR'); await g.step(2);
+await g.page.keyboard.down('Shift'); await g.step(Math.round(60 * 2.3)); s = await g.state(); await g.page.keyboard.up('Shift');
+check('hard boost', s.speed > 125, `${s.speed} m/s after 2.3 s of boost from the start line`);
+console.log('errors:', g.errors.length ? g.errors.slice(0, 6) : 'none');
+console.log(`${results.filter(Boolean).length}/${results.length} checks passed`);
+await g.browser.close();

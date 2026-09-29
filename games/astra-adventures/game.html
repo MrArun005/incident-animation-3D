@@ -99,6 +99,7 @@ h2 { margin: 0; font: 900 44px/0.9 var(--display); letter-spacing: 0.04em; color
 .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
 button.go { font: 900 26px/1 var(--display); letter-spacing: 0.1em; color: #17130a; background: var(--mark); border: 0; border-radius: 3px; padding: 14px 30px 12px; cursor: pointer; }
 button.go:hover { background: #ffd24a; }
+button.go:disabled { background: rgba(242, 194, 48, 0.35); color: rgba(23, 19, 10, 0.8); cursor: progress; }
 button.sec { font: 600 13px/1 var(--label); letter-spacing: 0.14em; text-transform: uppercase; color: var(--hull); background: transparent; border: 1px solid var(--rule); border-radius: 3px; padding: 11px 14px; cursor: pointer; }
 button.sec:hover { border-color: var(--mark); }
 button.sec[aria-pressed="true"] { border-color: var(--mark); color: var(--mark); }
@@ -136,7 +137,7 @@ body.touching .inst { margin-bottom: 150px; }
 <canvas id="view" tabindex="0" aria-label="Astra Adventures flight view"></canvas>
 
 <div class="hud" id="hud" hidden>
-  <div class="brand"><div class="t">ASTRA ADVENTURES</div><div class="s lbl">Jupiter Class IV · flight test</div></div>
+  <div class="brand"><div class="t">ASTRA ADVENTURES</div><div class="s lbl">Jupiter Class IV · flight test<span id="hDiff"></span></div></div>
   <div class="score">
     <div class="lbl">Pass score</div>
     <div class="big" id="hScore">000000</div>
@@ -181,7 +182,7 @@ body.touching .inst { margin-bottom: 150px; }
 
 <div class="ov" id="ovTitle">
   <div class="card">
-    <div class="eyebrow">Flight test 01 · blockout build</div>
+    <div class="eyebrow">Flight test 02 · Jupiter Class IV</div>
     <h1>ASTRA<br>ADVENTURES</h1>
     <div class="hazard" aria-hidden="true"></div>
     <p class="lede">Take the <b>Jupiter Class IV</b> through a sparse rock field with Vega on your right wing. Nothing to shoot for yet: fly close to rocks and the closer you pass, the more it scores.</p>
@@ -197,8 +198,9 @@ body.touching .inst { margin-bottom: 150px; }
       <div><span><kbd>R</kbd></span>Reset flight</div>
     </div>
     <div class="actions">
-      <button class="go" id="bLaunch" type="button">LAUNCH</button>
+      <button class="go" id="bLaunch" type="button" disabled>LOADING</button>
       <button class="sec" id="bInvT" type="button" aria-pressed="false">Inverted pitch: off</button>
+      <button class="sec" id="bDiffT" type="button" aria-pressed="false">Difficulty: Normal</button>
     </div>
     <p class="note" id="tNote">Press Enter to launch. This build needs a keyboard, or the on-screen stick on a touch screen.</p>
   </div>
@@ -215,6 +217,7 @@ body.touching .inst { margin-bottom: 150px; }
     <div class="actions">
       <button class="sec" id="bInv" type="button" aria-pressed="false">Inverted pitch: off</button>
       <button class="sec" id="bMute" type="button" aria-pressed="true">Sound: on</button>
+      <button class="sec" id="bDiff" type="button" aria-pressed="false">Difficulty: Normal</button>
     </div>
     <p class="note" id="invNote">Off: ↑ lifts the nose. On: ↑ drops the nose, like a flight stick.</p>
   </div>
@@ -227,19 +230,30 @@ body.touching .inst { margin-bottom: 150px; }
   </div>
 </div>
 
-<div id="fail" hidden><p class="lede">Astra Adventures needs WebGL, and this browser didn't provide it. Try a current desktop browser.</p></div>
+<div id="fail" hidden><p class="lede" id="failTxt">Astra Adventures needs WebGL, and this browser didn't provide it. Try a current desktop browser.</p></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.147.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
 <script>
-(() => {
+(async () => {
 'use strict';
 const $ = (id) => document.getElementById(id);
 const T = window.THREE;
 const store = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const MANUAL = !!window.__ASTRA_MANUAL;            // set by the test harness: the game advances only on __astra.step()
 let renderer = null;
-if (T) { try { renderer = new T.WebGLRenderer({ canvas: $('view'), antialias: true, powerPreference: 'high-performance', preserveDrawingBuffer: MANUAL }); } catch (e) { renderer = null; } }
-if (!renderer) { $('fail').hidden = false; $('ovTitle').hidden = true; return; }
+if (T && T.GLTFLoader && T.EffectComposer && T.UnrealBloomPass) { try { renderer = new T.WebGLRenderer({ canvas: $('view'), antialias: false, powerPreference: 'high-performance', preserveDrawingBuffer: MANUAL }); } catch (e) { renderer = null; } }
+function showFail(msg) { if (msg) $('failTxt').textContent = msg; $('fail').hidden = false; $('ovTitle').hidden = true; }
+if (T && !(T.GLTFLoader && T.EffectComposer && T.UnrealBloomPass)) { showFail("Part of three.js didn't load from the CDN. Reload the page to try again."); return; }
+if (!renderer) { showFail(); return; }
+// Anything that throws after this point (a model missing a part, a shader that won't link) says so on screen.
+window.addEventListener('unhandledrejection', (e) => { if (!(window.__astra && window.__astra.ready)) showFail(`The game failed to start (${(e.reason && e.reason.message) || e.reason}). Reload the page to try again.`); });
 
 /* ================================ helpers ================================ */
 const clamp = (x, a, b) => (x < a ? a : x > b ? b : x);
@@ -272,229 +286,446 @@ const FM = {
   boostDrain: 0.24, boostRecharge: 0.15, rechargeDelay: 0.8,
 };
 const PASS = 9;                                    // a pass inside this many metres of rock scores
+// Difficulty. Hard packs the field tighter, opens with a weaving gauntlet, flies faster and hurts more; its
+// passes score more to match.
+const DIFF = {
+  normal: { key: 'normal', label: 'Normal', rocks: 330, clusters: 7, spread: 1, cruise: 42, boost: 108, dmg: 1, mult: 1 },
+  hard: { key: 'hard', label: 'Hard', rocks: 560, clusters: 11, spread: 0.7, cruise: 56, boost: 132, dmg: 1.7, mult: 1.6 },
+};
+let D = DIFF[(/[?&]hard\b/.test(location.search) || store.get('astra-hard') === '1') ? 'hard' : 'normal'];
+function applyDifficulty() { FM.cruise = D.cruise; FM.boost = D.boost; }
+applyDifficulty();
 const FIELD = 1300, HALF = FIELD / 2;              // the rock field wraps around the ship in a 1.3 km cube
 const SUN_DIR = V3(0.72, 0.46, 0.52).normalize();
 
 /* ================================ scene ================================ */
-renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-renderer.outputEncoding = T.sRGBEncoding;
-renderer.toneMapping = T.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
-const FOGC = 0x070a12;
+const MOBILE = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) || Math.min(window.innerWidth, window.innerHeight) < 560;
+const GL2 = renderer.capabilities.isWebGL2;
+const HDR = GL2 && (renderer.extensions.has('EXT_color_buffer_float') || renderer.extensions.has('EXT_color_buffer_half_float'));
+const Q = { pr: Math.min(window.devicePixelRatio || 1, 1.5), msaa: HDR && !MOBILE ? 4 : 0, shadow: MOBILE ? 1024 : 2048, tex: MOBILE ? '-1k' : '' };
+renderer.setPixelRatio(Q.pr);
+renderer.outputEncoding = T.LinearEncoding;          // tone mapping and the sRGB curve happen in the final pass
+renderer.toneMapping = T.NoToneMapping;
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = T.PCFSoftShadowMap;
+renderer.info.autoReset = false;
+const FOGC = 0x04060b;
 renderer.setClearColor(FOGC);
 const scene = new T.Scene();
-scene.fog = new T.FogExp2(FOGC, 0.0019);
+scene.fog = new T.FogExp2(FOGC, 0.00105);
 const camera = new T.PerspectiveCamera(62, 1, 0.25, 12000);
-const sunLight = new T.DirectionalLight(0xfff0dc, 1.75);
-sunLight.position.copy(SUN_DIR).multiplyScalar(100); scene.add(sunLight); scene.add(sunLight.target);
-scene.add(new T.HemisphereLight(0x5b77b8, 0x1b140e, 0.62));
-
-// Sky: an equirect canvas with a faint galactic band and a warm glow where the sun sits.
-const sky = (() => {
-  const W = 2048, H = 1024, c = document.createElement('canvas'); c.width = W; c.height = H; const g = c.getContext('2d');
-  g.fillStyle = '#05070d'; g.fillRect(0, 0, W, H);
-  const r = mulberry(4);
-  const blob = (x, y, rad, rgb, a) => { for (const dx of [-W, 0, W]) { const gr = g.createRadialGradient(x + dx, y, 0, x + dx, y, rad); gr.addColorStop(0, `rgba(${rgb},${a})`); gr.addColorStop(1, `rgba(${rgb},0)`); g.fillStyle = gr; g.fillRect(x + dx - rad, y - rad, rad * 2, rad * 2); } };
-  const band = (x) => H * 0.5 + Math.sin((x / W) * Math.PI * 2 + 0.7) * H * 0.2;
-  for (let i = 0; i < 260; i++) { const x = r() * W, y = band(x) + gauss(r) * 55; blob(x, y, 40 + r() * 120, r() < 0.5 ? '70,90,160' : '110,80,150', 0.035 + r() * 0.05); }
-  for (let i = 0; i < 70; i++) { const x = r() * W, y = band(x) + gauss(r) * 20; blob(x, y, 20 + r() * 50, '14,12,20', 0.28); }
-  for (let i = 0; i < 18; i++) blob(r() * W, r() * H, 200 + r() * 260, r() < 0.5 ? '40,60,120' : '90,50,110', 0.035);
-  const th = Math.acos(SUN_DIR.y), ph = Math.atan2(SUN_DIR.z, -SUN_DIR.x), su = ((ph / (Math.PI * 2)) % 1 + 1) % 1;
-  blob(su * W, (th / Math.PI) * H, 520, '255,170,110', 0.22); blob(su * W, (th / Math.PI) * H, 160, '255,215,170', 0.3);
-  const tex = new T.CanvasTexture(c); tex.encoding = T.sRGBEncoding;
-  const m = new T.Mesh(new T.SphereGeometry(6000, 48, 24), new T.MeshBasicMaterial({ map: tex, side: T.BackSide, fog: false, depthWrite: false }));
-  m.renderOrder = -10; scene.add(m); return m;
-})();
-function starLayer(n, size, seed, bandBias) {
-  const r = mulberry(seed), pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
-  const tints = [[1, 1, 1], [0.78, 0.86, 1], [1, 0.9, 0.74]];
-  for (let i = 0; i < n; i++) {
-    let d = unit(r);
-    if (bandBias && r() < 0.45) { const a = r() * Math.PI * 2, tilt = 0.45; d = V3(Math.cos(a), Math.sin(a) * Math.sin(tilt) + gauss(r) * 0.08, Math.sin(a) * Math.cos(tilt)).normalize(); }
-    pos.set([d.x * 5000, d.y * 5000, d.z * 5000], i * 3);
-    const t = tints[(r() * 3) | 0], b = 0.3 + r() ** 2 * 0.7; col.set([t[0] * b, t[1] * b, t[2] * b], i * 3);
-  }
-  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
-  const p = new T.Points(geo, new T.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false, transparent: true }));
-  p.renderOrder = -9; scene.add(p); return p;
-}
-const stars = [starLayer(3200, 1.4, 11, true), starLayer(260, 2.6, 12, false)];
+const PLANET_DIR = V3(-0.35, 0.18, -0.92).normalize();
+// One hard sun that throws shadows (its box follows the lead ship), a little blue starlight, and warm
+// light bounced off the gas giant. Space is dark: the shadow side of a rock should be nearly black.
+const sunLight = new T.DirectionalLight(0xfff1e0, 2.35);
+scene.add(sunLight); scene.add(sunLight.target);
+sunLight.castShadow = true; sunLight.shadow.mapSize.set(Q.shadow, Q.shadow);
+const SHADOW_BOX = 46;
+Object.assign(sunLight.shadow.camera, { left: -SHADOW_BOX, right: SHADOW_BOX, top: SHADOW_BOX, bottom: -SHADOW_BOX, near: 20, far: 520 });
+sunLight.shadow.camera.updateProjectionMatrix();
+sunLight.shadow.bias = -0.00035; sunLight.shadow.normalBias = 0.035;
+const hemi = new T.HemisphereLight(0x7684a6, 0x2a2420, 0.15); scene.add(hemi);
+const planetShine = new T.DirectionalLight(0xffd6ad, 0.12); scene.add(planetShine); scene.add(planetShine.target);
 const glowTex = radial(128, [[0, 'rgba(255,255,255,1)'], [0.18, 'rgba(255,230,190,0.85)'], [0.45, 'rgba(255,160,90,0.22)'], [1, 'rgba(255,120,60,0)']]);
 const dotTex = radial(64, [[0, 'rgba(255,255,255,1)'], [0.35, 'rgba(255,255,255,0.6)'], [1, 'rgba(255,255,255,0)']]);
-const sunSprite = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffe2c0, blending: T.AdditiveBlending, depthWrite: false, fog: false, transparent: true }));
-sunSprite.scale.set(900, 900, 1); sunSprite.renderOrder = -8; scene.add(sunSprite);
+// The sun: an HDR glow and a small white-hot core; the bloom pass turns them into glare.
+const sunTex = radial(256, Array.from({ length: 12 }, (_, i) => { const t = i / 11, a = Math.exp(-t * 6.5) * (1 - t); return [t, `rgba(255,${Math.round(248 - 14 * t)},${Math.round(240 - 30 * t)},${a.toFixed(3)})`]; }));
+const sunGlow = new T.Sprite(new T.SpriteMaterial({ map: sunTex, color: new T.Color(1.2, 1.16, 1.1), blending: T.AdditiveBlending, depthWrite: false, fog: false, transparent: true }));
+sunGlow.scale.set(1000, 1000, 1); sunGlow.renderOrder = -8; scene.add(sunGlow);
+const sunCore = new T.Sprite(new T.SpriteMaterial({ map: dotTex, color: new T.Color(6, 5.6, 4.8), blending: T.AdditiveBlending, depthWrite: false, fog: false, transparent: true }));
+sunCore.scale.set(120, 120, 1); sunCore.renderOrder = -7; scene.add(sunCore);
+// Lens ghosts along the line from the sun through the middle of the frame, faint, hidden when a rock covers it.
+const ringTex = radial(128, [[0, 'rgba(255,255,255,0)'], [0.62, 'rgba(255,255,255,0.05)'], [0.8, 'rgba(255,255,255,0.5)'], [0.9, 'rgba(255,255,255,0.12)'], [1, 'rgba(255,255,255,0)']]);
+const FLARE = [[0.35, 0.9, glowTex, [0.35, 0.22, 0.12]], [0.62, 0.35, ringTex, [0.10, 0.22, 0.30]], [0.95, 0.22, glowTex, [0.22, 0.13, 0.30]], [1.25, 0.6, ringTex, [0.26, 0.18, 0.10]], [1.6, 0.3, glowTex, [0.08, 0.20, 0.22]]]
+  .map(([f, sz, map, c]) => { const sp = new T.Sprite(new T.SpriteMaterial({ map, color: new T.Color(...c), blending: T.AdditiveBlending, depthTest: false, depthWrite: false, fog: false, transparent: true })); sp.renderOrder = 10; sp.userData = { f, sz, c }; scene.add(sp); return sp; });
+const flareV = { ndc: V3(), p: V3(), d: V3(), vis: 0 };
+function updateFlare(dt) {
+  camera.updateMatrixWorld();                       // the camera moved (and shook) this frame
+  const n = flareV.ndc.copy(camera.position).addScaledVector(SUN_DIR, 1000).project(camera);
+  let on = n.z < 1 && Math.abs(n.x) < 1.15 && Math.abs(n.y) < 1.15 ? 1 : 0;
+  if (on) for (const R of ROCKS) {                 // a rock between the camera and the sun blots it out
+    flareV.d.subVectors(R.c, camera.position); const t = flareV.d.dot(SUN_DIR); if (t < 0) continue;
+    if (flareV.d.lengthSq() - t * t < R.reach * R.reach * 0.8) { on = 0; break; }
+  }
+  flareV.vis = approach(flareV.vis, on * (1 - Math.min(1, Math.hypot(n.x, n.y) * 0.55)), 0.08, dt);
+  for (const sp of FLARE) {
+    const { f, sz, c } = sp.userData;
+    sp.visible = flareV.vis > 0.01; if (!sp.visible) continue;
+    flareV.p.set(n.x * (1 - 2 * f), n.y * (1 - 2 * f), 0.5).unproject(camera);
+    sp.position.copy(camera.position).add(flareV.p.sub(camera.position).normalize().multiplyScalar(20));
+    const k = 20 * Math.tan((camera.fov * Math.PI) / 360) * sz; sp.scale.set(k, k, 1);
+    sp.material.color.setRGB(c[0] * flareV.vis, c[1] * flareV.vis, c[2] * flareV.vis);
+  }
+}
+
+// Post: the scene renders into a multisampled HDR target, bloom picks out what is brighter than white
+// (engines, sun, bolts, sparks), then one pass does ACES tone mapping, a gentle vignette, film grain and
+// the sRGB curve.
+const FinalShader = {
+  uniforms: { tDiffuse: { value: null }, uExposure: { value: 1.0 }, uTime: { value: 0 }, uVignette: { value: 0.32 }, uGrain: { value: 0.018 }, uRes: { value: new T.Vector2(1, 1) } },
+  vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `
+    uniform sampler2D tDiffuse; uniform float uExposure, uTime, uVignette, uGrain; uniform vec2 uRes; varying vec2 vUv;
+    vec3 RRTAndODTFit(vec3 v) { vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
+    const mat3 ACESIn = mat3(vec3(0.59719, 0.07600, 0.02840), vec3(0.35458, 0.90834, 0.13383), vec3(0.04823, 0.01566, 0.83777));
+    const mat3 ACESOut = mat3(vec3(1.60475, -0.10208, -0.00327), vec3(-0.53108, 1.10813, -0.07276), vec3(-0.07367, -0.00605, 1.07602));
+    vec3 toSRGB(vec3 c) { return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c)); }
+    float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+    void main() {
+      vec2 d = vUv - 0.5;
+      float ca = dot(d, d) * 0.004;
+      vec3 c = vec3(texture2D(tDiffuse, vUv + d * ca).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - d * ca).b);
+      c = clamp(ACESOut * RRTAndODTFit(ACESIn * (c * uExposure / 0.6)), 0.0, 1.0);
+      c *= 1.0 - uVignette * smoothstep(0.3, 1.0, length(d * vec2(1.0, 0.8)) * 1.35);
+      c = toSRGB(c);
+      c += (hash(vUv * uRes + fract(uTime * 7.13)) - 0.5) * uGrain;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+};
+let composer = null, bloomPass = null, finalPass = null;
+function makeComposer() {
+  const pr = renderer.getPixelRatio(), size = new T.Vector2(Math.round(window.innerWidth * pr), Math.round(window.innerHeight * pr));
+  if (Q.msaa && size.x * size.y > 3.2e6) Q.msaa = 2;                   // big canvases: 2x MSAA is plenty
+  const rt = new T.WebGLRenderTarget(size.x, size.y, { type: HDR ? T.HalfFloatType : T.UnsignedByteType, samples: Q.msaa });
+  composer = new T.EffectComposer(renderer, rt);
+  composer.setPixelRatio(pr); composer.setSize(window.innerWidth, window.innerHeight);   // a composer given its own target starts at ratio 1
+  composer.addPass(new T.RenderPass(scene, camera));
+  // An 8-bit target clips at white, so there the threshold has to sit below it.
+  bloomPass = new T.UnrealBloomPass(new T.Vector2(size.x, size.y), HDR ? 0.75 : 0.5, 0.36, HDR ? 2.2 : 0.82);
+  bloomPass.materialHighPassFilter.fragmentShader = bloomPass.materialHighPassFilter.fragmentShader.replace('gl_FragColor = mix( outputColor, texel, alpha );', 'gl_FragColor = min( mix( outputColor, texel, alpha ), vec4( 2.4 ) );');
+  bloomPass.materialHighPassFilter.needsUpdate = true;
+  composer.addPass(bloomPass);
+  // r147 builds the bloom chain in 8-bit; faint glow then bands into blocks once the tone curve lifts it.
+  if (HDR) [bloomPass.renderTargetBright, ...bloomPass.renderTargetsHorizontal, ...bloomPass.renderTargetsVertical].forEach((t) => { t.texture.type = T.HalfFloatType; t.dispose(); });
+  finalPass = new T.ShaderPass(FinalShader); composer.addPass(finalPass);
+}
+
+/* ================================ assets ================================ */
+// Everything the eye sees was built offline in blender/: the ship (modelled, UV'd, baked and painted), six
+// asteroids and the sky. Load it all before the launch button wakes up.
+const A = 'assets/';
+const manager = new T.LoadingManager();
+manager.onProgress = (url, done, total) => { const b = $('bLaunch'); if (b.disabled) b.textContent = `LOADING ${Math.round((done / Math.max(total, 1)) * 100)}%`; };
+const gltfL = new T.GLTFLoader(manager), texL = new T.TextureLoader(manager), fileL = new T.FileLoader(manager);
+fileL.setResponseType('json');
+const maxAniso = renderer.capabilities.getMaxAnisotropy();
+const loadTex = (name, srgb, flipY = false, aniso = 8) => texL.loadAsync(A + name).catch(() => { throw new Error(`${name} failed to load`); }).then((t) => { t.encoding = srgb ? T.sRGBEncoding : T.LinearEncoding; t.flipY = flipY; t.anisotropy = Math.min(aniso, maxAniso); return t; });
+let assets;
+try {
+  const rockInfo = await fileL.loadAsync(A + 'rocks.json');
+  const [shipGltf, shipInfo, rocksGltf, skyTex, starInfo, vegaMap, detailTex, ...rockTex] = await Promise.all([
+    gltfL.loadAsync(A + `jupiter${Q.tex}.glb`), fileL.loadAsync(A + 'jupiter.json'), gltfL.loadAsync(A + 'rocks.glb'),
+    loadTex(MOBILE ? 'sky-2k.jpg' : 'sky.jpg', true, true, 4), fileL.loadAsync(A + 'stars.json'), loadTex(`jupiter-vega${Q.tex}.jpg`, true), loadTex('rock-detail.jpg', false, false, 8),
+    ...rockInfo.rocks.flatMap((r) => [loadTex(`rock-${r.name}-albedo${Q.tex}.jpg`, true), loadTex(`rock-${r.name}-normal${Q.tex}.jpg`, false)]),
+  ]);
+  assets = { rockInfo, shipGltf, shipInfo, rocksGltf, skyTex, starInfo, vegaMap, detailTex, rockTex };
+} catch (e) {
+  $('failTxt').textContent = `The ship and rock models didn't load (${(e && e.message) || e}). Reload the page to try again.`;
+  $('fail').hidden = false; $('ovTitle').hidden = true; return;
+}
+assets.detailTex.wrapS = assets.detailTex.wrapT = T.RepeatWrapping;
+assets.skyTex.mapping = T.EquirectangularReflectionMapping;
+scene.background = assets.skyTex;
+{
+  const w = MOBILE ? 1024 : 2048, c = document.createElement('canvas'); c.width = w; c.height = w / 2;
+  c.getContext('2d').drawImage(assets.skyTex.image, 0, 0, w, w / 2);
+  const small = new T.CanvasTexture(c); small.encoding = T.sRGBEncoding; small.mapping = T.EquirectangularReflectionMapping;
+  const pm = new T.PMREMGenerator(renderer); scene.environment = pm.fromEquirectangular(small).texture; pm.dispose(); small.dispose();
+}
+makeComposer();
+const starField = (() => {
+  const S = assets.starInfo.stars.filter((st) => st[3] > 0.02), g = new T.Group();
+  for (const [lo, hi, size] of [[0.02, 0.25, 1.35], [0.25, 1e9, 2.1]]) {
+    const L = S.filter((st) => st[3] >= lo && st[3] < hi), pos = new Float32Array(L.length * 3), col = new Float32Array(L.length * 3);
+    L.forEach(([x, y, z, f, r, gg, b], i) => { pos.set([x * 9000, y * 9000, z * 9000], i * 3); const k = Math.min(2.6, 0.35 + f * 1.1); col.set([r * k, gg * k, b * k], i * 3); });
+    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(pos, 3)); geo.setAttribute('color', new T.BufferAttribute(col, 3));
+    const p = new T.Points(geo, new T.PointsMaterial({ size, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false, transparent: true, blending: T.AdditiveBlending }));
+    p.renderOrder = -9; p.frustumCulled = false; g.add(p);
+  }
+  scene.add(g); return g;
+})();
 
 /* ================================ rocks ================================ */
-function heightAt(S, x, y, z) {
-  let h = 1 + S.amp * fbm(x * 1.8 + S.off[0], y * 1.8 + S.off[1], z * 1.8 + S.off[2]);
-  for (const c of S.craters) { const d = Math.hypot(x - c.x, y - c.y, z - c.z) / c.rad; if (d < 1) h -= c.depth * (1 - d * d); else if (d < 1.35) h += c.depth * 0.4 * Math.sin(((d - 1) / 0.35) * Math.PI); }
-  return h;
-}
+// Six asteroids built offline (blender/rocks.py): an Eros-like potato, a rubble pile, a fractured shard, a
+// contact binary, a spinning top and a lumpy body. Each is star-shaped about its centre, so a radial table
+// sampled from the drawn surface answers "where is the rock's surface in this direction?" — the same
+// surface you see, which is what a close pass is measured against. Three LODs each, one texture set.
+const TAB_LAT = assets.rockInfo.lat, TAB_LON = assets.rockInfo.lon;
+const VARIANTS = assets.rockInfo.rocks.map((info) => {
+  const n = info.table.length / 4, table = new Float32Array(n);
+  for (let i = 0; i < n; i++) table[i] = (parseInt(info.table.substr(i * 4, 2), 16) | (parseInt(info.table.substr(i * 4 + 2, 2), 16) << 8)) / 65535 * info.rmax;
+  return { name: info.name, maxR: info.rmax, table, geos: [] };
+});
+assets.rocksGltf.scene.traverse((o) => { if (!o.isMesh) return; const m = /^(\w+)_lod(\d)$/.exec(o.name); const V = m && VARIANTS.find((v) => v.name === m[1]); if (V) V.geos[+m[2]] = o.geometry; });
+VARIANTS.forEach((V) => { for (let l = 0; l < 3; l++) if (!V.geos[l]) throw new Error(`rocks.glb has no ${V.name}_lod${l}`); });
 // Distance from the rock centre to its surface along a unit direction (rock-local), in units of the rock's scale.
-// This is the same function that shaped the mesh, so a skim is measured against the rock you see.
 function surfR(S, ux, uy, uz) {
-  let x = ux / S.axes[0], y = uy / S.axes[1], z = uz / S.axes[2]; const l = Math.hypot(x, y, z); x /= l; y /= l; z /= l;
-  const h = heightAt(S, x, y, z);
-  return Math.hypot(x * h * S.axes[0], y * h * S.axes[1], z * h * S.axes[2]) * S.norm;
+  const lat = Math.asin(clamp(uy, -1, 1)); let lon = Math.atan2(uz, ux); if (lon < 0) lon += Math.PI * 2;
+  const fi = clamp(((lat + Math.PI / 2) / Math.PI) * TAB_LAT - 0.5, 0, TAB_LAT - 1.0001), fj = (lon / (Math.PI * 2)) * TAB_LON;
+  const i0 = Math.floor(fi), j0 = Math.floor(fj), di = fi - i0, dj = fj - j0, i1 = Math.min(TAB_LAT - 1, i0 + 1), ja = j0 % TAB_LON, jb = (j0 + 1) % TAB_LON, t = S.table;
+  return (t[i0 * TAB_LON + ja] * (1 - dj) + t[i0 * TAB_LON + jb] * dj) * (1 - di) + (t[i1 * TAB_LON + ja] * (1 - dj) + t[i1 * TAB_LON + jb] * dj) * di;
 }
-function makeShape(seed, detail) {
-  const r = mulberry(seed);
-  const S = { off: [r() * 40, r() * 40, r() * 40], axes: [0.86 + r() * 0.3, 0.8 + r() * 0.24, 0.88 + r() * 0.3], amp: 0.1 + r() * 0.07, craters: [], norm: 1, maxR: 1 };
-  const nc = 3 + ((r() * 5) | 0);
-  for (let i = 0; i < nc; i++) { const d = unit(r); S.craters.push({ x: d.x, y: d.y, z: d.z, rad: 0.2 + r() * 0.28, depth: 0.035 + r() * 0.06 }); }
-  const geo = new T.IcosahedronGeometry(1, detail), p = geo.attributes.position, v = V3();
-  let sum = 0;
-  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).normalize(); const h = heightAt(S, v.x, v.y, v.z); v.multiplyScalar(h); v.x *= S.axes[0]; v.y *= S.axes[1]; v.z *= S.axes[2]; p.setXYZ(i, v.x, v.y, v.z); sum += v.length(); }
-  S.norm = p.count / sum;
-  for (let i = 0; i < p.count; i++) { v.fromBufferAttribute(p, i).multiplyScalar(S.norm); p.setXYZ(i, v.x, v.y, v.z); S.maxR = Math.max(S.maxR, v.length()); }
-  geo.computeVertexNormals(); S.geo = geo; return S;
+const vIndex = (name) => VARIANTS.findIndex((v) => v.name === name);
+function pickVariant(s, r) {
+  const list = s > 24 ? ['potato', 'rubble', 'binary', 'top', 'lumpy'] : ['potato', 'rubble', 'shard', 'shard', 'binary', 'top', 'lumpy', 'lumpy'];
+  return vIndex(list[(r() * list.length) | 0]);
 }
-const SHAPES = []; for (let k = 0; k < 8; k++) SHAPES.push(makeShape(900 + k * 131, k < 4 ? 3 : 2));
 const ROCKS = [];
-function addRock(c, s, r) {
-  const k = s > 17 ? (r() * 4) | 0 : 4 + ((r() * 4) | 0);
+function addRock(c, s, r, k = pickVariant(s, r)) {
   const q = new T.Quaternion().setFromEuler(new T.Euler(r() * 6.3, r() * 6.3, r() * 6.3));
-  const tone = 0.2 + r() * 0.17, warm = r() * 0.04 - 0.012;
-  ROCKS.push({ c, s, S: SHAPES[k], k, q, qi: q.clone().invert(), axis: unit(r), spin: (0.012 + r() * 0.08) * (s > 17 ? 0.45 : 1), color: new T.Color(tone + warm, tone, tone - warm * 0.7), reach: 0 });
+  const tone = 0.66 + r() * 0.4, warm = r() * 0.07 - 0.025;
+  const R = { c, s, S: VARIANTS[k], k, q, qi: q.clone().invert(), axis: unit(r), spin: (0.012 + r() * 0.07) * (s > 17 ? 0.45 : 1), color: new T.Color(tone + warm, tone, tone - warm * 0.8), reach: s * VARIANTS[k].maxR };
+  ROCKS.push(R); return R;
 }
-(function placeRocks() {
-  const r = mulberry(20260929);
-  // The opening slalom: three rocks just off the straight line from the start, all on Vega's far side.
-  addRock(V3(-(15 + 9.6), 1, -330), 15, r);
-  addRock(V3(-3, -(22 + 5.6), -610), 22, r);
-  addRock(V3(-(34 + 12.5), 2, -900), 34, r);
-  const clusters = Array.from({ length: 7 }, () => V3((r() - 0.5) * FIELD, (r() - 0.5) * FIELD * 0.7, (r() - 0.5) * FIELD));
+// A rock beside the straight line out of the start, its nearest surface `clear` metres from that line.
+function besidePath(z, side, s, clear, k, r) {
+  const R = addRock(V3(0, 0, z), s, r, k); R.spin = 0; side.normalize();
+  const probe = V3(), local = V3(), dirs = [], dr = mulberry(99 + ROCKS.length);
+  for (let i = 0; i < 900; i++) dirs.push(unit(dr));
+  const at = (d) => { local.copy(d).normalize().applyQuaternion(R.qi); probe.copy(d).normalize().multiplyScalar(surfR(R.S, local.x, local.y, local.z) * s).add(R.c); return Math.hypot(probe.x, probe.y); };
+  const t1 = V3(), t2 = V3(), q = V3();
+  const nearest = (off) => {                 // closest distance from the path line (x = y = 0) to the surface
+    R.c.copy(side).multiplyScalar(off).setZ(z);
+    const top = dirs.map((d) => [at(d), d]).sort((a, b) => a[0] - b[0]).slice(0, 4);
+    let best = top[0][0];
+    for (const [v0, d0] of top) {            // pattern search on the sphere round each of the best few
+      const d = d0.clone(); let v = v0;
+      for (let h = 0.08; h > 0.002; h *= 0.5) {
+        let moved = true;
+        while (moved) {
+          moved = false; t1.set(d.z, 0, -d.x); if (t1.lengthSq() < 1e-6) t1.set(1, 0, 0); t1.normalize(); t2.crossVectors(d, t1);
+          for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { q.copy(d).addScaledVector(t1, a * h).addScaledVector(t2, b * h).normalize(); const w = at(q); if (w < v - 1e-6) { v = w; d.copy(q); moved = true; break; } }
+        }
+      }
+      best = Math.min(best, v);
+    }
+    return best;
+  };
+  let lo = clear, hi = clear + s * 2.2;
+  for (let i = 0; i < 20; i++) { const mid = (lo + hi) / 2; if (nearest(mid) < clear) lo = mid; else hi = mid; }
+  nearest(hi); return R;
+}
+// The hard gauntlet: a weaving line out of the start, rocks set close either side of it.
+const gauntletAt = (z) => V3(Math.sin(-z / 190) * 26, Math.sin(-z / 260 + 1.1) * 12 - Math.sin(1.1) * 12, z);
+const wrapD = (a, b) => { const d = a - b; return d - Math.round(d / FIELD) * FIELD; };
+const wrapDist = (a, b) => Math.hypot(wrapD(a.x, b.x), wrapD(a.y, b.y), wrapD(a.z, b.z));
+function placeRocks() {
+  const r = mulberry(D.key === 'hard' ? 20261031 : 20260929);
+  if (D.key === 'hard') {
+    for (let z = -360, i = 0; z > -2650; z -= 150 + (i % 3) * 28, i++) {
+      const c = gauntletAt(z), s = 11 + ((i * 7) % 5) * 4.5, th = (i % 2 ? 0 : Math.PI) + [0, 0.35, -0.3, 0.55, -0.5][i % 5];
+      const R = besidePath(z, V3(Math.cos(th), Math.sin(th) * 0.8, 0), s, 8.2 - (i % 3) * 0.9, [vIndex('rubble'), vIndex('potato'), vIndex('lumpy'), vIndex('shard')][i % 4], r);
+      R.c.add(V3(c.x, c.y, 0)); R.gauntlet = true;
+    }
+  } else {
+    // The opening slalom: three rocks just off the straight line from the start, all on Vega's far side.
+    besidePath(-330, V3(-1, 0.05, 0), 15, 9.4, vIndex('rubble'), r);
+    besidePath(-610, V3(-0.12, -1, 0), 22, 5.4, vIndex('potato'), r);
+    besidePath(-900, V3(-1, 0.04, 0), 34, 12.0, vIndex('lumpy'), r);
+  }
+  const clusters = Array.from({ length: D.clusters }, () => V3((r() - 0.5) * FIELD, (r() - 0.5) * FIELD * 0.7, (r() - 0.5) * FIELD));
   let tries = 0;
-  while (ROCKS.length < 330 && tries++ < 20000) {
-    const c = r() < 0.55 ? clusters[(r() * clusters.length) | 0].clone().add(V3(gauss(r) * 95, gauss(r) * 70, gauss(r) * 95)) : V3((r() - 0.5) * FIELD, (r() - 0.5) * FIELD, (r() - 0.5) * FIELD);
+  while (ROCKS.length < D.rocks && tries++ < 40000) {
+    const c = r() < 0.6 ? clusters[(r() * clusters.length) | 0].clone().add(V3(gauss(r) * 95 * D.spread, gauss(r) * 70 * D.spread, gauss(r) * 95 * D.spread)) : V3((r() - 0.5) * FIELD, (r() - 0.5) * FIELD, (r() - 0.5) * FIELD);
     for (const a of ['x', 'y', 'z']) c[a] = ((c[a] + HALF) % FIELD + FIELD) % FIELD - HALF;
     let s = 4 + 15 * r() ** 1.8; const roll = r(); if (roll < 0.09) s = 24 + r() * 26; else if (roll < 0.105) s = 62 + r() * 48;
-    if (Math.abs(c.x) < s * 1.3 + 45 && Math.abs(c.y) < s * 1.3 + 38 && c.z > -1000 && c.z < 90) continue;   // keep the opening run clear
-    if (ROCKS.some((o) => o.c.distanceTo(c) < (o.s + s) * 1.25 + 6)) continue;
-    addRock(c, s, r);
+    const k = pickVariant(s, r), reach = s * VARIANTS[k].maxR;
+    if (D.key === 'hard') {                        // clear of the gauntlet, including where the wrapping field repeats it
+      let near = false;
+      for (let k = 0; k < 3 && !near; k++) { const z = c.z - k * FIELD, g = gauntletAt(z); if (z > -2750 && z < 90 && Math.hypot(c.x - g.x, c.y - g.y) < reach + 30) near = true; }
+      if (near) continue;
+    } else if (Math.abs(c.x) < reach + 45 && Math.abs(c.y) < reach + 38 && [c.z, c.z - FIELD].some((z) => z > -1000 - reach && z < 90 + reach)) continue;   // keep the opening run clear
+    if (ROCKS.some((o) => wrapDist(o.c, c) < (o.reach + reach) * 1.02 + 6)) continue;
+    addRock(c, s, r, k);
   }
-})();
-const rockMat = new T.MeshStandardMaterial({ color: 0xffffff, roughness: 0.94, metalness: 0.02, flatShading: true });
-const rockMeshes = SHAPES.map((S, k) => {
-  const list = ROCKS.filter((R) => R.k === k);
-  const m = new T.InstancedMesh(S.geo, rockMat, Math.max(1, list.length));
-  m.count = list.length; m.frustumCulled = false; m.instanceMatrix.setUsage(T.DynamicDrawUsage);
-  list.forEach((R, i) => { R.slot = i; m.setColorAt(i, R.color); });
-  if (m.instanceColor) m.instanceColor.needsUpdate = true;
-  scene.add(m); return m;
-});
-ROCKS.forEach((R) => { R.reach = R.s * R.S.maxR; });
+  ROCKS.forEach((R) => { R.c0 = R.c.clone(); });
+}
+placeRocks();
+// Rock shading: the albedo and an OBJECT-space normal map (exact, from the full-detail surface), turned by
+// each instance's rotation; plus close-up grit, triplanar in metres of rock, that fades out with distance.
+function rockMaterial(k) {
+  const m = new T.MeshStandardMaterial({ map: assets.rockTex[k * 2], normalMap: assets.rockTex[k * 2 + 1], normalMapType: T.ObjectSpaceNormalMap, roughness: 0.94, metalness: 0, envMapIntensity: 0.85 });
+  m.onBeforeCompile = (sh) => {
+    const V = 'varying vec4 vObjPos;\nvarying vec3 vObjN;\nvarying vec4 vInstQ;\n';
+    const QF = `vec4 quatOf(mat3 m) {
+      float tr = m[0][0] + m[1][1] + m[2][2], s;
+      if (tr > 0.0) { s = sqrt(tr + 1.0) * 2.0; return vec4(m[1][2] - m[2][1], m[2][0] - m[0][2], m[0][1] - m[1][0], 0.25 * s * s) / s; }
+      if (m[0][0] > m[1][1] && m[0][0] > m[2][2]) { s = sqrt(1.0 + m[0][0] - m[1][1] - m[2][2]) * 2.0; return vec4(0.25 * s * s, m[1][0] + m[0][1], m[2][0] + m[0][2], m[1][2] - m[2][1]) / s; }
+      if (m[1][1] > m[2][2]) { s = sqrt(1.0 + m[1][1] - m[0][0] - m[2][2]) * 2.0; return vec4(m[1][0] + m[0][1], 0.25 * s * s, m[2][1] + m[1][2], m[2][0] - m[0][2]) / s; }
+      s = sqrt(1.0 + m[2][2] - m[0][0] - m[1][1]) * 2.0; return vec4(m[2][0] + m[0][2], m[2][1] + m[1][2], 0.25 * s * s, m[0][1] - m[1][0]) / s;
+    }\n`;
+    sh.uniforms.uDetail = { value: assets.detailTex }; sh.uniforms.uDetailScale = { value: 2.6 }; sh.uniforms.uDetailAmt = { value: 0.55 }; sh.uniforms.uTexRes = { value: assets.rockTex[k * 2].image.width || 2048 };
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\n' + V + QF)
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvObjPos = vec4(position, 1.0); vObjN = normal;')
+      .replace('#include <project_vertex>', '#include <project_vertex>\n#ifdef USE_INSTANCING\nvObjPos.w = length(instanceMatrix[0].xyz); vInstQ = quatOf(mat3(instanceMatrix) / vObjPos.w);\n#else\nvInstQ = vec4(0.0, 0.0, 0.0, 1.0);\n#endif');
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\n' + V + 'uniform sampler2D uDetail;\nuniform float uDetailScale;\nuniform float uDetailAmt;\nuniform float uTexRes;\nvec3 qrot(vec4 q, vec3 v) { return v + 2.0 * cross(q.xyz, cross(q.xyz, v) + q.w * v); }\n')
+      .replace('#include <map_fragment>', `
+        vec3 rDir = normalize(vObjPos.xyz);
+        float rLod = max(0.0, log2(max(length(dFdx(rDir)), length(dFdy(rDir))) * uTexRes / 3.14159 + 1e-6));
+        #if __VERSION__ >= 300
+          #define RSAMPLE(t, uv) textureLod(t, uv, rLod)
+        #else
+          #define RSAMPLE(t, uv) texture2D(t, uv)
+        #endif
+        diffuseColor *= RSAMPLE(map, vUv);
+        vec3 dP = vObjPos.xyz * vObjPos.w / uDetailScale;
+        vec3 dW = pow(abs(normalize(vObjN)), vec3(4.0)); dW /= (dW.x + dW.y + dW.z);
+        vec3 dX = texture2D(uDetail, dP.zy).xyz, dY = texture2D(uDetail, dP.xz + 0.37).xyz, dZ = texture2D(uDetail, dP.xy + 0.71).xyz;
+        float dFade = uDetailAmt * (1.0 - smoothstep(30.0, 140.0, vViewPosition.z));
+        diffuseColor.rgb *= 1.0 + ((dX.z * dW.x + dY.z * dW.y + dZ.z * dW.z) - 0.5) * 1.3 * dFade;`)
+      .replace('#include <normal_fragment_maps>', `
+        vec3 nObj = RSAMPLE(normalMap, vUv).xyz * 2.0 - 1.0;
+        vec3 dn = dW.x * vec3(0.0, dX.y * 2.0 - 1.0, dX.x * 2.0 - 1.0) + dW.y * vec3(dY.x * 2.0 - 1.0, 0.0, dY.y * 2.0 - 1.0) + dW.z * vec3(dZ.x * 2.0 - 1.0, dZ.y * 2.0 - 1.0, 0.0);
+        nObj = normalize(nObj + dn * dFade);
+        normal = normalize(normalMatrix * qrot(normalize(vInstQ), nObj));`);
+  };
+  return m;
+}
+const WHITE = new T.Color(1, 1, 1);
+const rockMats = VARIANTS.map((V, k) => rockMaterial(k));
+const rockMeshes = [], lodCount = VARIANTS.map(() => [0, 0, 0]);
+function makeRockMeshes() {
+  rockMeshes.forEach((L) => L.forEach((m) => { scene.remove(m); m.dispose(); }));
+  rockMeshes.length = 0;
+  VARIANTS.forEach((V, k) => {
+    const n = Math.max(1, ROCKS.filter((R) => R.k === k).length);
+    rockMeshes.push(V.geos.map((geo, lod) => {
+      const m = new T.InstancedMesh(geo, rockMats[k], n); m.count = 0; m.frustumCulled = false;
+      m.instanceMatrix.setUsage(T.DynamicDrawUsage); m.setColorAt(0, WHITE); m.instanceColor.setUsage(T.DynamicDrawUsage);
+      m.castShadow = lod < 2; m.receiveShadow = true; scene.add(m); return m;
+    }));
+  });
+}
+makeRockMeshes();
 const tmpM = new T.Matrix4(), tmpQ = new T.Quaternion(), tmpS = V3();
 function updateRocks(dt, center) {
+  const eye = camera.position; lodCount.forEach((c) => c.fill(0));
   for (const R of ROCKS) {
-    if (dt > 0) { R.q.premultiply(tmpQ.setFromAxisAngle(R.axis, R.spin * dt)); R.qi.copy(R.q).invert(); }
-    for (const a of ['x', 'y', 'z']) { const d = R.c[a] - center[a]; if (d > HALF) R.c[a] -= FIELD; else if (d < -HALF) R.c[a] += FIELD; }
-    tmpM.compose(R.c, R.q, tmpS.set(R.s, R.s, R.s)); rockMeshes[R.k].setMatrixAt(R.slot, tmpM);
+    if (dt > 0 && R.spin) { R.q.premultiply(tmpQ.setFromAxisAngle(R.axis, R.spin * dt)); R.qi.copy(R.q).invert(); }
+    if (R.gauntlet && !R.freed && center.z < R.c.z - 300) R.freed = true;          // the gauntlet holds still until flown
+    if (!R.gauntlet || R.freed) for (const a of ['x', 'y', 'z']) { const d = R.c[a] - center[a]; if (d > HALF) R.c[a] -= FIELD; else if (d < -HALF) R.c[a] += FIELD; }
+    const edge = Math.hypot(R.c.x - eye.x, R.c.y - eye.y, R.c.z - eye.z) - R.reach;
+    const lod = edge < 70 ? 0 : edge < 280 ? 1 : 2, m = rockMeshes[R.k][lod], i = lodCount[R.k][lod]++;
+    const wr = clamp((HALF - Math.max(Math.abs(R.c.x - center.x), Math.abs(R.c.y - center.y), Math.abs(R.c.z - center.z))) / 110, 0, 1), sc = Math.max(1e-3, R.s * wr * wr * (3 - 2 * wr));
+    tmpM.compose(R.c, R.q, tmpS.set(sc, sc, sc)); m.setMatrixAt(i, tmpM); m.setColorAt(i, R.color);
   }
-  rockMeshes.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
+  rockMeshes.forEach((L, k) => L.forEach((m, lod) => { m.count = lodCount[k][lod]; m.instanceMatrix.needsUpdate = true; m.instanceColor.needsUpdate = true; }));
 }
 const gv = V3();
-function gapTo(R, p) {                              // metres from point p to the rock's surface (negative = inside)
+function gapTo(R, p) {                              // metres from point p to the rock's surface along the radial (negative = inside)
   gv.subVectors(p, R.c); const d = gv.length(); if (d < 1e-4) return -R.s;
   gv.applyQuaternion(R.qi).divideScalar(d);
   return d - surfR(R.S, gv.x, gv.y, gv.z) * R.s;
 }
-
-/* ================================ the ship ================================ */
-// Jupiter Class IV blockout: a narrow central body with a pointed nose and canopy, two wings that join the body
-// to the wing engines, a gun on each wing, three engines in all. Ship axes: +X right, +Y up, -Z forward.
-const ENGINE_POS = [V3(0, 0, 6.95), V3(-5.3, 0.05, 4.76), V3(5.3, 0.05, 4.76)];
-const ENGINE_R = [0.5, 0.46, 0.46];
-const GUNS = [V3(-6.05, 0.3, -4.6), V3(6.05, 0.3, -4.6)];
-const SAMPLES = [                                  // collision and close-pass probes, in ship space
-  { p: V3(0, 0.1, -5.4), r: 0.85, part: 'nose' }, { p: V3(0, 0, -1.6), r: 1.25, part: 'hull' }, { p: V3(0, 0, 2.2), r: 1.4, part: 'hull' },
-  { p: V3(0, 0, 5.6), r: 1.0, part: 'hull' }, { p: V3(-5.3, 0.05, 1.7), r: 1.2, part: 'wingtip' }, { p: V3(5.3, 0.05, 1.7), r: 1.2, part: 'wingtip' },
-  { p: V3(-3, 0.05, 1.8), r: 0.8, part: 'wing' }, { p: V3(3, 0.05, 1.8), r: 0.8, part: 'wing' },
-];
-const flameGeo = new T.ConeGeometry(1, 1, 16, 1, true); flameGeo.rotateX(Math.PI / 2); flameGeo.translate(0, 0, 0.5);
-function buildShip(accentHex) {
-  const g = new T.Group();
-  const M = {
-    hull: new T.MeshStandardMaterial({ color: 0xc4c0b6, roughness: 0.6, metalness: 0.1 }),
-    panel: new T.MeshStandardMaterial({ color: 0xa9adb3, roughness: 0.66, metalness: 0.2 }),
-    dark: new T.MeshStandardMaterial({ color: 0x2a2e36, roughness: 0.5, metalness: 0.45 }),
-    glass: new T.MeshStandardMaterial({ color: 0x0b1624, roughness: 0.14, metalness: 0.7, emissive: 0x123b5e, emissiveIntensity: 0.5 }),
-    mark: new T.MeshStandardMaterial({ color: accentHex, roughness: 0.52, metalness: 0.05 }),
-  };
-  const add = (geo, m, x, y, z) => { const o = new T.Mesh(geo, m); o.position.set(x, y, z); g.add(o); return o; };
-  const cylZ = (r1, r2, len, m, x, y, z, seg = 18) => { const geo = new T.CylinderGeometry(r1, r2, len, seg); geo.rotateX(Math.PI / 2); return add(geo, m, x, y, z); };
-  add(new T.BoxGeometry(1.6, 1.2, 8.4), M.hull, 0, 0, 0.3);                               // body
-  const noseG = new T.ConeGeometry(1, 3.4, 4, 1); noseG.rotateY(Math.PI / 4); noseG.rotateX(-Math.PI / 2); noseG.scale(1.131, 0.849, 1);
-  add(noseG, M.hull, 0, 0, -5.6);                                                          // nose
-  const can = add(new T.SphereGeometry(1, 20, 12), M.glass, 0, 0.6, -2.1); can.scale.set(0.6, 0.42, 1.55);
-  add(new T.BoxGeometry(0.55, 0.28, 3.4), M.panel, 0, 0.72, 1.7);                          // dorsal spine
-  add(new T.BoxGeometry(0.9, 0.3, 5.0), M.panel, 0, -0.72, 0.9);                           // keel
-  add(new T.BoxGeometry(1.64, 1.24, 0.34), M.mark, 0, 0, -3.35);                           // nose band
-  cylZ(0.62, 0.72, 2.1, M.dark, 0, 0, 5.45); cylZ(0.8, 0.6, 0.6, M.panel, 0, 0, 6.62);     // centre engine
-  for (const s of [-1, 1]) {
-    const sh = new T.Shape(); sh.moveTo(0.8 * s, -0.4); sh.lineTo(4.7 * s, 0.4); sh.lineTo(4.7 * s, 3.1); sh.lineTo(0.8 * s, 3.6); sh.closePath();
-    const wg = new T.ExtrudeGeometry(sh, { depth: 0.26, bevelEnabled: false }); wg.rotateX(Math.PI / 2); wg.translate(0, 0.18, 0);
-    add(wg, M.hull, 0, 0, 0);                                                              // wing
-    add(new T.BoxGeometry(3.9, 0.22, 0.8), M.panel, s * 2.75, -0.45, 2.7);                 // lower spar: the connection
-    const st = add(new T.BoxGeometry(3.3, 0.03, 0.3), M.mark, s * 2.75, 0.195, 0.42); st.rotation.y = -s * 0.2;   // yellow marking
-    cylZ(0.64, 0.72, 5.0, M.hull, s * 5.3, 0.05, 1.7);                                     // wing engine
-    cylZ(0.7, 0.66, 0.45, M.dark, s * 5.3, 0.05, -0.95);                                   // intake
-    cylZ(0.745, 0.745, 0.5, M.mark, s * 5.3, 0.05, 0.45);                                  // engine band
-    cylZ(0.56, 0.74, 0.55, M.dark, s * 5.3, 0.05, 4.46);                                   // nozzle
-    add(new T.BoxGeometry(0.34, 0.34, 1.6), M.panel, s * 6.05, 0.3, 0.6);                  // gun housing
-    cylZ(0.085, 0.085, 4.2, M.dark, s * 6.05, 0.3, -2.2, 8);                                // barrel
-    cylZ(0.13, 0.13, 0.3, M.dark, s * 6.05, 0.3, -4.35, 8);                                 // muzzle
-    const nav = add(new T.SphereGeometry(0.13, 10, 8), new T.MeshBasicMaterial({ color: s < 0 ? 0xff3b30 : 0x34ff7a }), s * 6.03, 0.05, 3.7); nav.userData.nav = true;
-  }
-  const beacon = add(new T.SphereGeometry(0.12, 10, 8), new T.MeshBasicMaterial({ color: 0xffffff }), 0, 0.92, 3.3);
-  const glowDisc = new T.MeshBasicMaterial({ color: 0xff9a52 });
-  const flames = [], glows = [];
-  ENGINE_POS.forEach((p, i) => {
-    const disc = add(new T.CircleGeometry(ENGINE_R[i] * 1.05, 20), glowDisc, p.x, p.y, p.z - 0.02);
-    const outer = add(flameGeo, new T.MeshBasicMaterial({ color: 0xff8a3d, transparent: true, opacity: 0.5, blending: T.AdditiveBlending, depthWrite: false }), p.x, p.y, p.z);
-    const inner = add(flameGeo, new T.MeshBasicMaterial({ color: 0xfff0c8, transparent: true, opacity: 0.75, blending: T.AdditiveBlending, depthWrite: false }), p.x, p.y, p.z);
-    const glow = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffa860, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); glow.position.copy(p).add(V3(0, 0, 0.35)); g.add(glow);
-    flames.push({ outer, inner, r: ENGINE_R[i], disc }); glows.push(glow);
-  });
-  const light = new T.PointLight(0xff8a3c, 1, 45, 2); light.position.set(0, 0, 8); g.add(light);
-  const muzzles = GUNS.map((p) => { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: 0xffe08a, blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.position.copy(p); s.scale.set(3, 3, 1); s.visible = false; g.add(s); return s; });
-  g.traverse((o) => { if (o.isMesh) o.castShadow = false; });
-  return { g, flames, glows, light, beacon, muzzles };
+// The rocks aren't spheres, so the radial gap overstates how far away a sloping face is, and the ray from
+// the centre is a poor contact normal. The true normal comes from differencing the radial table along two
+// tangents; the gap is then the distance to the tangent plane there.
+const gq = { t1: V3(), t2: V3(), a: V3(), b: V3() };
+function rockPt(R, x, y, z, out) { const L = Math.hypot(x, y, z); x /= L; y /= L; z /= L; const r = surfR(R.S, x, y, z); return out.set(x * r, y * r, z * r); }
+function localNormal(R, l, out) {                    // outward normal near rock-local unit direction l
+  const t1 = gq.t1.set(l.z, 0, -l.x); if (t1.lengthSq() < 1e-6) t1.set(1, 0, 0); t1.normalize();
+  const t2 = gq.t2.crossVectors(l, t1), e = 0.035;
+  rockPt(R, l.x + t1.x * e, l.y + t1.y * e, l.z + t1.z * e, gq.a); rockPt(R, l.x - t1.x * e, l.y - t1.y * e, l.z - t1.z * e, out); gq.a.sub(out);
+  rockPt(R, l.x + t2.x * e, l.y + t2.y * e, l.z + t2.z * e, gq.b); rockPt(R, l.x - t2.x * e, l.y - t2.y * e, l.z - t2.z * e, out); gq.b.sub(out);
+  out.crossVectors(gq.a, gq.b).normalize(); if (out.dot(l) < 0) out.negate();
+  return out;
+}
+// Gap from a probe sphere (centre p, radius r) to rock R's surface; the world-space contact normal goes in n.
+function probeGap(R, p, r, n) {
+  gv.subVectors(p, R.c); const d = gv.length(); if (d < 1e-4) { n.set(0, 1, 0); return -R.s - r; }
+  gv.applyQuaternion(R.qi).divideScalar(d);
+  const g = d - surfR(R.S, gv.x, gv.y, gv.z) * R.s;
+  if (g > 3 * PASS) { n.copy(gv).applyQuaternion(R.q); return g - r; }   // far off: the radial gap will do
+  localNormal(R, gv, n); const c = Math.max(0.25, n.dot(gv)); n.applyQuaternion(R.q);
+  return g * c - r;
 }
 
-class Ribbon {                                      // an additive trail that faces the camera
-  constructor(n, color, width) {
-    this.n = n; this.pts = Array.from({ length: n }, () => V3()); this.count = 0; this.color = new T.Color(color); this.width = width;
-    this.pos = new Float32Array(n * 6); this.col = new Float32Array(n * 6);
-    const idx = []; for (let i = 0; i < n - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
-    const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.BufferAttribute(this.pos, 3)); geo.setAttribute('color', new T.BufferAttribute(this.col, 3)); geo.setIndex(idx);
-    this.mesh = new T.Mesh(geo, new T.MeshBasicMaterial({ vertexColors: true, transparent: true, blending: T.AdditiveBlending, depthWrite: false, side: T.DoubleSide }));
-    this.mesh.frustumCulled = false; scene.add(this.mesh);
+/* ================================ the ship ================================ */
+// The Jupiter Class IV, modelled, UV-unwrapped, baked and painted offline (blender/ship_*.py) and loaded
+// as glTF: a narrow chined body with a bubble canopy, two engine wings braced by a lower strut, a gun on
+// each nacelle, three engines. Ship axes: +X right, +Y up, -Z forward. The engine exits, muzzles and
+// collision probes ship with the model (jupiter.json), so gameplay and geometry can't drift apart.
+const SI = assets.shipInfo;
+const ENGINE_POS = SI.engines.map((p) => V3(...p));
+const ENGINE_R = SI.engineR.slice();
+const GUNS = SI.guns.map((p) => V3(...p));
+const SAMPLES = SI.samples.map((s) => ({ p: V3(...s.p), r: s.r, part: s.part }));
+const LIVERY = {
+  lead: { core: new T.Color(1.0, 0.86, 0.64), edge: new T.Color(1.0, 0.42, 0.13), map: null },
+  vega: { core: new T.Color(0.80, 0.90, 1.0), edge: new T.Color(0.25, 0.52, 1.0), map: assets.vegaMap },
+};
+const glassMat = new T.MeshStandardMaterial({ color: 0x05070a, roughness: 0.05, metalness: 0.15, transparent: true, opacity: 0.42, envMapIntensity: 3.2, depthWrite: false });
+const LAMPS = { NavR: [0.3, 3.2, 0.8], NavL: [3.4, 0.28, 0.16], Beacon: [4.5, 0.35, 0.2], StrobeR: [7, 7, 7], StrobeL: [7, 7, 7] };
+// Exhaust: camera-facing puffs strung down each engine's axis, brightest at the nozzle, with standing shock
+// diamonds; one instanced draw per ship. Seen from behind they stack into a hot core, side-on into a plume.
+const PUFFS = 48;                                  // dense enough that a boosting plume reads as one flame, not beads
+const plumeMat = new T.ShaderMaterial({
+  vertexShader: `attribute vec3 iPos; attribute float iSize; attribute vec3 iColor; varying vec2 vUv; varying vec3 vCol;
+    void main() { vUv = uv; vec4 mv = modelViewMatrix * vec4(iPos, 1.0); vCol = iColor * smoothstep(1.5, 5.0, -mv.z); mv.xy += position.xy * iSize; gl_Position = projectionMatrix * mv; }`,
+  fragmentShader: `varying vec2 vUv; varying vec3 vCol;
+    void main() { vec2 d = vUv - 0.5; float r2 = dot(d, d) * 4.0; float a = exp(-r2 * 3.2) * (1.0 - smoothstep(0.6, 1.0, r2)); gl_FragColor = vec4(vCol * (a * 0.6 + exp(-r2 * 18.0) * 0.9), 1.0); }`,
+  transparent: true, blending: T.AdditiveBlending, depthWrite: false,
+});
+class Plume {
+  constructor(L) {
+    this.L = L; this.n = ENGINE_POS.length * (PUFFS + 2);
+    const base = new T.PlaneGeometry(1, 1), geo = new T.InstancedBufferGeometry();
+    geo.index = base.index; geo.setAttribute('position', base.attributes.position); geo.setAttribute('uv', base.attributes.uv);
+    this.pos = new T.InstancedBufferAttribute(new Float32Array(this.n * 3), 3).setUsage(T.DynamicDrawUsage);
+    this.size = new T.InstancedBufferAttribute(new Float32Array(this.n), 1).setUsage(T.DynamicDrawUsage);
+    this.col = new T.InstancedBufferAttribute(new Float32Array(this.n * 3), 3).setUsage(T.DynamicDrawUsage);
+    geo.setAttribute('iPos', this.pos); geo.setAttribute('iSize', this.size); geo.setAttribute('iColor', this.col); geo.instanceCount = this.n;
+    this.mesh = new T.Mesh(geo, plumeMat); this.mesh.frustumCulled = false; this.mesh.renderOrder = 3;
   }
-  clear() { this.count = 0; }
-  push(p) { const last = this.pts.pop(); last.copy(p); this.pts.unshift(last); this.count = Math.min(this.n, this.count + 1); }
-  update(camPos, k) {
-    const a = V3(), side = V3(), view = V3();
-    const near = (p) => { const d = p.distanceTo(camPos); return d < 10 ? 0 : d > 34 ? 1 : ((d - 10) / 24) ** 2; };
-    for (let i = 0; i < this.n; i++) {
-      const p = this.pts[Math.min(i, Math.max(0, this.count - 1))], p0 = this.pts[Math.max(0, i - 1)], p1 = this.pts[Math.min(this.count - 1, i + 1)];
-      a.subVectors(p0, p1); view.subVectors(camPos, p); side.crossVectors(a, view); const L = side.length();
-      const f = i < this.count ? 1 - i / this.n : 0, w = this.width * (0.25 + 0.75 * f);
-      if (L > 1e-6) side.multiplyScalar(w / L); else side.set(0, 0, 0);
-      this.pos.set([p.x + side.x, p.y + side.y, p.z + side.z, p.x - side.x, p.y - side.y, p.z - side.z], i * 6);
-      const b = f * f * f * k * near(p); this.col.set([this.color.r * b, this.color.g * b, this.color.b * b, this.color.r * b, this.color.g * b, this.color.b * b], i * 6);
-    }
-    this.mesh.geometry.attributes.position.needsUpdate = true; this.mesh.geometry.attributes.color.needsUpdate = true;
+  update(s, t) {
+    const L = this.L, thr = s.thrust, bst = s.boostVis, on = s.alive ? 1 : 0, c = this._c || (this._c = new T.Color());
+    let j = 0;
+    const put = (x, y, z, size, r, g, b) => { this.pos.setXYZ(j, x, y, z); this.size.setX(j, size); this.col.setXYZ(j, r, g, b); j++; };
+    ENGINE_POS.forEach((E, e) => {
+      const R = ENGINE_R[e], I = (0.55 + thr * 1.6 + bst * 2.6) * on;
+      const len = (1.3 + thr * 3.2 + bst * 6.5) * (1 + 0.05 * Math.sin(t * 37 + e * 2.1)) * (e === 0 ? 1.1 : 1);
+      const nd = 3.2 + bst * 1.8;
+      for (let k = 0; k < PUFFS; k++) {
+        const u = k / (PUFFS - 1), z = E.z + 0.05 + len * Math.pow(u, 1.2);
+        const dia = Math.pow(0.5 + 0.5 * Math.cos(u * nd * Math.PI * 2), 6);
+        const b = I * Math.pow(1 - u, 1.7) * (0.72 + 0.4 * dia) * 0.3;          // per puff: twice the puffs, same total light
+        c.copy(L.core).lerp(L.edge, Math.pow(u, 0.55));
+        put(E.x, E.y, z, R * (1.95 - 1.15 * u) * (1 + bst * 0.25), c.r * b, c.g * b, c.b * b);
+      }
+      put(E.x, E.y, E.z + 0.1, R * 1.45, L.core.r * I * 2.0, L.core.g * I * 2.0, L.core.b * I * 2.0);        // white-hot at the exit
+      const h = (0.12 + thr * 0.07 + bst * 0.12) * on;
+      put(E.x, E.y, E.z + 0.35, R * (4.4 + thr * 2 + bst * 3.4), L.edge.r * h, L.edge.g * h, L.edge.b * h);  // soft halo
+    });
+    this.pos.needsUpdate = this.size.needsUpdate = this.col.needsUpdate = true;
   }
+}
+function buildShip(livery) {
+  const L = LIVERY[livery], g = new T.Group(), model = assets.shipGltf.scene.clone(true), parts = {};
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    parts[o.name] = o;
+    if (o.name === 'Hull') {
+      o.material = o.material.clone(); if (L.map) o.material.map = L.map;
+      o.material.envMapIntensity = 0.75; o.castShadow = true; o.receiveShadow = true;
+    } else if (o.name === 'Glass') { o.material = glassMat; o.renderOrder = 2; }
+    else { const c = LAMPS[o.name]; o.material = new T.MeshBasicMaterial({ color: c ? new T.Color(...c) : new T.Color(1, 1, 1), fog: false }); }
+  });
+  for (const n of ['Hull', 'Glass', 'GlowC', 'GlowL', 'GlowR', 'Beacon', 'StrobeL', 'StrobeR']) if (!parts[n]) throw new Error(`jupiter.glb has no ${n}`);
+  g.add(model);
+  const plume = new Plume(L); g.add(plume.mesh);
+  const light = new T.PointLight(L.edge.getHex(), 1, 15, 2); light.position.set(0, 0.6, 7.6); g.add(light);
+  const muzzles = GUNS.map((p) => { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: new T.Color(4, 3.2, 1.8), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.position.copy(p); s.scale.set(2.6, 2.6, 1); s.visible = false; g.add(s); return s; });
+  return { g, plume, light, muzzles, livery: L, glowDiscs: ['GlowC', 'GlowL', 'GlowR'].map((n) => parts[n]), beacon: parts.Beacon, strobes: [parts.StrobeL, parts.StrobeR] };
 }
 
 const wq = new T.Quaternion(), we = new T.Euler();
 class Ship {
-  constructor(name, accent, trail, trailLen) {
-    this.name = name; const b = buildShip(accent); Object.assign(this, b); scene.add(this.g);
+  constructor(name, livery) {
+    this.name = name; const b = buildShip(livery); Object.assign(this, b); scene.add(this.g);
     this.pos = V3(); this.vel = V3(); this.q = new T.Quaternion(); this.qv = new T.Quaternion(); this.ang = V3();
     this.inp = { pitch: 0, yaw: 0, strafe: 0, boost: false, fire: false };
-    this.trails = ENGINE_POS.map((p, i) => new Ribbon(trailLen, trail, ENGINE_R[i] * 0.9));
+    this.trails = [];
     this.speedTarget = null; this.alive = true; this.reset(V3(), new T.Quaternion(), 0);
   }
   reset(p, q, speed) {
@@ -535,9 +766,8 @@ class Ship {
   world(local, out = V3()) { return out.copy(local).applyQuaternion(this.qv).add(this.pos); }
 }
 
-const player = new Ship('Lead', 0xe8b923, 0xff9a4a, 22);
-const wing = new Ship('Vega', 0x4aa3e8, 0x6fb6ff, 34);
-wing.trailGain = 0.55;                                   // her trail is seen side-on, so it can be quieter
+const player = new Ship('Lead', 'lead');
+const wing = new Ship('Vega', 'vega');
 const START = { lead: V3(0, 0, 0), vega: V3(17, 2.5, -3) };
 
 /* ================================ effects ================================ */
@@ -572,6 +802,7 @@ class Particles {
 }
 const fxr = mulberry(77);
 const sparks = new Particles(700, 0.55, 0xffc46a);
+sparks.base.multiplyScalar(3.2);                       // HDR, so hot sparks bloom
 const dust = new Particles(500, 1.5, 0x5a5650);
 
 // Space dust: short streaks that stream past the ship, so speed reads even in empty space.
@@ -595,7 +826,7 @@ function updateDust(ship, camPos) {
 
 // Wing gun bolts.
 const boltGeo = new T.BoxGeometry(0.16, 0.16, 5.5);
-const boltMat = new T.MeshBasicMaterial({ color: 0xffd36a, transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false });
+const boltMat = new T.MeshBasicMaterial({ color: new T.Color(5.0, 3.4, 1.2), transparent: true, opacity: 0.95, blending: T.AdditiveBlending, depthWrite: false });
 const bolts = Array.from({ length: 36 }, () => { const m = new T.Mesh(boltGeo, boltMat); m.visible = false; scene.add(m); return { m, pos: V3(), vel: V3(), life: 0 }; });
 function fireGuns(ship) {
   if (ship.gunCd > 0 || !ship.alive) return;
@@ -711,7 +942,7 @@ function closePass(e) {
   const k = clamp((PASS - e.min) / PASS, 0, 1);
   run.streak = simTime - run.lastPass < 5 ? run.streak + 1 : 1; run.lastPass = simTime;
   const mult = Math.min(4, 1 + (run.streak - 1) * 0.5);
-  const pts = Math.round(((60 + 440 * k ** 1.5) * (e.speed / FM.cruise) * mult) / 10) * 10;
+  const pts = Math.round(((60 + 440 * k ** 1.5) * (e.speed / 42) * mult * D.mult) / 10) * 10;
   run.score += pts; run.passes++; run.closest = Math.min(run.closest, e.min);
   if (run.score > best) { best = run.score; store.set('astra-best', String(best)); }
   popup.t = clock; popup.a = e.part === 'wingtip' ? 'WINGTIP PASS' : e.min < 1.5 ? 'KNIFE EDGE' : 'CLOSE PASS';
@@ -742,6 +973,7 @@ function breach() {
   $('ovBreach').hidden = false;
 }
 const hp = V3(), hn = V3();
+const pn = V3(), cn = V3();
 function collide(ship, isPlayer) {
   const vis = ship.qv;
   for (let i = 0; i < ROCKS.length; i++) {
@@ -750,17 +982,17 @@ function collide(ship, isPlayer) {
     let best = Infinity, bs = null;
     for (const S of SAMPLES) {
       hp.copy(S.p).applyQuaternion(vis).add(ship.pos);
-      const gap = gapTo(R, hp) - S.r;
-      if (gap < best) { best = gap; bs = S; hn.copy(hp); }
+      const gap = probeGap(R, hp, S.r, pn);
+      if (gap < best) { best = gap; bs = S; hn.copy(hp); cn.copy(pn); }
     }
     if (best < 0) {
-      const n = V3().subVectors(hn, R.c).normalize();
+      const n = cn.clone();
       ship.pos.addScaledVector(n, -best + 0.02);
       const vn = ship.vel.dot(n);
       if (vn < 0) {
         const impact = -vn; ship.vel.addScaledVector(n, -1.35 * vn); const vt = ship.vel.clone().addScaledVector(n, -ship.vel.dot(n)); ship.vel.addScaledVector(vt, -0.12);
         ship.ang.x += (fxr() - 0.5) * impact * 0.03; ship.ang.y += (fxr() - 0.5) * impact * 0.03; ship.ang.z += (fxr() - 0.5) * impact * 0.05;
-        if (impact > 2.5 && ship.hitCd <= 0) { ship.hitCd = 0.3; ship.hull = Math.max(0, ship.hull - clamp(impact * 0.85, 4, 50) * (isPlayer ? 1 : 0.35)); onHit(ship, impact, hn.clone(), n); }
+        if (impact > 2.5 && ship.hitCd <= 0) { ship.hitCd = 0.3; ship.hull = Math.max(0, ship.hull - clamp(impact * 0.85, 4, 50) * (isPlayer ? D.dmg : 0.35)); onHit(ship, impact, hn.clone(), n); }
       }
     }
     if (isPlayer) trackEnc(i, R, best, bs);
@@ -857,7 +1089,11 @@ window.addEventListener('keydown', (e) => {
 });
 window.addEventListener('keyup', (e) => keys.delete(e.code));
 window.addEventListener('blur', () => { keys.clear(); cam.dragging = false; if (mode === 'fly' && !paused && !MANUAL) togglePause(); });
-document.addEventListener('visibilitychange', () => { if (document.hidden && mode === 'fly' && !paused && !MANUAL) togglePause(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden && mode === 'fly' && !paused && !MANUAL) togglePause();
+  if (AU.ctx) { if (document.hidden) AU.ctx.suspend(); else if (!muted) AU.ctx.resume(); }
+  dyn.reset();
+});
 
 // Camera drag: grab the view and swing it round the ship. The ship keeps flying where it was pointed.
 const cam = { q: new T.Quaternion(), yaw: 0, pitch: 0, dragging: false, idle: 9, id: null, lx: 0, ly: 0, fov: 62, lag: V3(), prevVel: V3(), acc: V3(), orbit: 0 };
@@ -901,7 +1137,7 @@ function resetFlight(announce) {
   Object.assign(run, { score: 0, passes: 0, streak: 0, lastPass: -99, closest: Infinity, hits: 0 });
   cam.q.copy(player.q); cam.yaw = cam.pitch = 0; cam.lag.set(0, 0, 0); cam.prevVel.copy(player.vel); hitStop = 0; timeScale = 1;
   // put every rock back where it started, so a reset really is the same start line
-  ROCKS.forEach((R) => { R.c.copy(R.c0); });
+  ROCKS.forEach((R) => { R.c.copy(R.c0); R.freed = false; });
   updateRocks(0, player.pos);
   if (announce) { log('reset', {}); toast('Flight reset'); say('reset', true); }
 }
@@ -921,6 +1157,8 @@ function togglePause() {
   if (!paused) view.focus({ preventScroll: true });
 }
 function syncToggles() {
+  for (const id of ['bDiff', 'bDiffT']) { $(id).textContent = `Difficulty: ${D.label}`; $(id).setAttribute('aria-pressed', String(D.key === 'hard')); }
+  $('hDiff').textContent = D.key === 'hard' ? ' · hard' : '';
   for (const id of ['bInv', 'bInvT']) { $(id).textContent = `Inverted pitch: ${inverted ? 'on' : 'off'}`; $(id).setAttribute('aria-pressed', String(inverted)); }
   $('bMute').textContent = `Sound: ${muted ? 'off' : 'on'}`; $('bMute').setAttribute('aria-pressed', String(!muted));
   $('kPitch').textContent = inverted ? 'Pitch (inverted)' : 'Pitch';
@@ -933,6 +1171,15 @@ $('bLaunch').onclick = () => launch();
 $('bResume').onclick = () => togglePause();
 $('bReset').onclick = () => { resetFlight(true); if (paused) togglePause(); };
 $('bInv').onclick = () => toggleInvert(); $('bInvT').onclick = () => toggleInvert();
+// Switching difficulty rebuilds the field and puts you back on the start line.
+function setDifficulty(key) {
+  if (D.key === key) return;
+  D = DIFF[key]; store.set('astra-hard', key === 'hard' ? '1' : '0'); applyDifficulty();
+  ROCKS.length = 0; placeRocks(); makeRockMeshes(); enc.clear();
+  resetFlight(mode !== 'title'); syncToggles(); log('difficulty', { key });
+  toast(key === 'hard' ? 'Hard: a tighter field, a gauntlet off the line, more speed, more damage' : 'Normal difficulty');
+}
+$('bDiff').onclick = $('bDiffT').onclick = () => setDifficulty(D.key === 'hard' ? 'normal' : 'hard');
 $('bMute').onclick = () => toggleMute();
 $('btnPause').onclick = () => togglePause();
 syncToggles();
@@ -965,17 +1212,17 @@ function simulate(dt) {
 }
 
 /* ================================ camera ================================ */
-const cv = { off: V3(), f: V3(), u: V3(), r: V3(), tgt: V3(), oq: new T.Quaternion(), e: new T.Euler(0, 0, 0, 'YXZ'), shake: V3() };
+const cv = { off: V3(), f: V3(), u: V3(), r: V3(), tgt: V3(), oq: new T.Quaternion(), e: new T.Euler(0, 0, 0, 'YXZ'), shake: V3(), push: V3() };
 function updateCamera(dt, simDt) {
   const s = player;
   if (mode === 'title') {                            // a slow walk-round of both ships
-    const a = clock * 0.14 + 0.9, R = 40;
-    camera.position.set(s.pos.x + 7 + Math.sin(a) * R, s.pos.y + 9 + Math.sin(clock * 0.3) * 2, s.pos.z + 4 + Math.cos(a) * R);
+    const a = clock * 0.12 + 0.9, R = 25;
+    camera.position.set(s.pos.x + 4 + Math.sin(a) * R, s.pos.y + 7 + Math.sin(clock * 0.3) * 1.5, s.pos.z + 1 + Math.cos(a) * R);
     camera.up.set(0, 1, 0);
     const wide = window.innerWidth > 820;
-    cv.tgt.set(s.pos.x + 7, s.pos.y, s.pos.z + 4); camera.lookAt(cv.tgt);
-    if (wide) { cv.r.set(1, 0, 0).applyQuaternion(camera.quaternion); cv.tgt.addScaledVector(cv.r, -15); camera.lookAt(cv.tgt); }
-    camera.fov = 50; camera.updateProjectionMatrix(); return;
+    cv.tgt.set(s.pos.x + 4, s.pos.y, s.pos.z + 1); camera.lookAt(cv.tgt);
+    if (wide) { cv.r.set(1, 0, 0).applyQuaternion(camera.quaternion); cv.tgt.addScaledVector(cv.r, -12); camera.lookAt(cv.tgt); }
+    camera.fov = 46; camera.updateProjectionMatrix(); return;
   }
   // The camera trails the ship's rotation: turn, and for a moment you see her side before it catches up.
   cam.q.slerp(s.q, 1 - Math.exp(-dt * 4.2));
@@ -992,6 +1239,7 @@ function updateCamera(dt, simDt) {
   const sh = fx.shake * fx.shake;
   cv.shake.set(Math.sin(clock * 41) * 0.6 + Math.sin(clock * 67 + 1) * 0.4, Math.sin(clock * 37 + 2) * 0.6 + Math.sin(clock * 73) * 0.4, 0).multiplyScalar(sh * 0.42);
   camera.position.copy(s.pos).add(cv.off);
+  { const dv = camera.position.distanceTo(wing.pos); if (dv < 12) camera.position.addScaledVector(cv.push.subVectors(camera.position, wing.pos).normalize(), 12 - dv); }
   cv.f.set(0, 0, -1).applyQuaternion(cam.q); cv.u.set(0, 1, 0).applyQuaternion(cam.q);
   cv.tgt.copy(s.pos).addScaledVector(cv.f, 30 * (1 - orbit)).addScaledVector(cv.u, 2.4 * (1 - orbit));
   camera.up.copy(cv.u).applyAxisAngle(cv.f, s.bank * 0.28 * (1 - orbit));
@@ -1005,18 +1253,13 @@ function updateCamera(dt, simDt) {
 /* ================================ per-frame visuals ================================ */
 function shipVisuals(s, dt) {
   s.g.position.copy(s.pos); s.g.quaternion.copy(s.qv);
-  const flick = 1 + Math.sin(clock * 43 + s.pos.x) * 0.06 + Math.sin(clock * 71) * 0.04;
-  s.flames.forEach((F, i) => {
-    const len = (1.1 + s.thrust * 2.2 + s.boostVis * 3.2) * flick * (i === 0 ? 1.1 : 1), r = F.r * (0.8 + s.thrust * 0.35);
-    F.outer.scale.set(r, r, len); F.inner.scale.set(r * 0.55, r * 0.55, len * 0.62);
-    F.outer.material.opacity = 0.32 + s.thrust * 0.3; F.inner.material.opacity = 0.55 + s.thrust * 0.35;
-    const gs = (1.1 + s.thrust * 1.0 + s.boostVis * 1.5) * F.r * 2; s.glows[i].scale.set(gs, gs, 1);
-  });
-  s.light.intensity = 0.22 + s.thrust * 0.4 + s.boostVis * 0.55;
-  s.beacon.visible = (clock % 1.3) < 0.1;
+  s.plume.update(s, clock);
+  const gk = (2.0 + s.thrust * 3.0 + s.boostVis * 4.0) * (s.alive ? 1 : 0);
+  s.glowDiscs.forEach((m) => m.material.color.copy(s.livery.core).multiplyScalar(gk));
+  s.light.intensity = 0.35 + s.thrust * 0.7 + s.boostVis * 1.0;
+  s.beacon.visible = (clock % 1.3) < 0.09;
+  const st = (clock + 0.4) % 1.1; s.strobes.forEach((m) => { m.visible = st < 0.05 || (st > 0.13 && st < 0.17); });
   s.muzzles.forEach((m, i) => { s.flash[i] = Math.max(0, s.flash[i] - dt); m.visible = s.flash[i] > 0; });
-  if (!paused && s.alive) s.trails.forEach((t, i) => t.push(s.world(ENGINE_POS[i], V3())));
-  s.trails.forEach((t) => t.update(camera.position, (s.alive ? 0.1 + s.thrust * 0.12 + s.boostVis * 0.22 : 0.06) * (s.trailGain ?? 1)));   // additive + sRGB: small numbers read bright
 }
 const scr = V3();
 function toScreen(p, W, H) { scr.copy(p).applyMatrix4(camera.matrixWorldInverse); if (scr.z > -0.1) return null; scr.copy(p).project(camera); return [(scr.x * 0.5 + 0.5) * W, (-scr.y * 0.5 + 0.5) * H]; }
@@ -1065,6 +1308,15 @@ function hud(dt) {
 }
 
 /* ================================ frame ================================ */
+// The sun's shadow box follows the lead ship, snapped to whole shadow texels so edges don't crawl.
+const lf = { x: V3(), y: V3(), p: V3(), mid: V3() };
+lf.x.crossVectors(AY, SUN_DIR).normalize(); lf.y.crossVectors(SUN_DIR, lf.x);
+function aimLights(focus) {
+  const tx = (SHADOW_BOX * 2) / Q.shadow, a = Math.round(focus.dot(lf.x) / tx) * tx, b = Math.round(focus.dot(lf.y) / tx) * tx, c = focus.dot(SUN_DIR);
+  lf.p.copy(lf.x).multiplyScalar(a).addScaledVector(lf.y, b).addScaledVector(SUN_DIR, c);
+  sunLight.target.position.copy(lf.p); sunLight.position.copy(lf.p).addScaledVector(SUN_DIR, 260); sunLight.target.updateMatrixWorld();
+  planetShine.target.position.copy(focus); planetShine.position.copy(focus).addScaledVector(PLANET_DIR, 100); planetShine.target.updateMatrixWorld();
+}
 function frame(dtReal, draw = true) {
   const dt = Math.min(Math.max(dtReal, 0), 1 / 20);
   clock += dt;
@@ -1079,18 +1331,41 @@ function frame(dtReal, draw = true) {
   updateRocks(paused ? 0 : dt, player.pos);
   shipVisuals(player, dt); shipVisuals(wing, dt);
   updateCamera(dt, simDt);
-  sky.position.copy(camera.position); stars.forEach((p) => p.position.copy(camera.position));
-  sunSprite.position.copy(camera.position).addScaledVector(SUN_DIR, 5200);
+  sunGlow.position.copy(camera.position).addScaledVector(SUN_DIR, 5200); sunCore.position.copy(sunGlow.position); starField.position.copy(camera.position);
+  updateFlare(dt);
+  aimLights(mode === 'title' ? lf.mid.copy(player.pos).lerp(wing.pos, 0.35) : player.pos);
   updateDust(player, camera.position);
   audioUpdate(dt);
-  if (draw) renderer.render(scene, camera); else camera.updateMatrixWorld();
+  if (draw) { renderer.info.reset(); finalPass.uniforms.uTime.value = clock % 60; composer.render(); } else camera.updateMatrixWorld();
   hud(dt);
 }
-function resize() { const w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+function resize() { const w = window.innerWidth, h = window.innerHeight, pr = renderer.getPixelRatio(); renderer.setSize(w, h, false); composer.setPixelRatio(pr); composer.setSize(w, h); finalPass.uniforms.uRes.value.set(w * pr, h * pr); camera.aspect = w / h; camera.updateProjectionMatrix(); }
 window.addEventListener('resize', resize); resize();
-ROCKS.forEach((R) => { R.c0 = R.c.clone(); });
 resetFlight(false);
-if (!MANUAL) { let last = performance.now(); const loop = (now) => { frame((now - last) / 1000); last = now; requestAnimationFrame(loop); }; requestAnimationFrame(loop); }
+// Dynamic resolution: if frames run long for a couple of seconds, draw fewer pixels; win them back when there's room.
+const dyn = { acc: 0, n: 0, mn: 1, base: Q.pr, scale: 1, cool: 0, hold: 4, upAt: -99, t: 0, reset() { this.acc = 0; this.n = 0; this.mn = 1; this.cool = Math.max(this.cool, 1); } };
+function govern(dt) {
+  if (dt > 0.1) return;                            // a hitch or a background tab, not a measurement
+  dyn.t += dt; dyn.acc += dt; dyn.n++; dyn.mn = Math.min(dyn.mn, dt); dyn.cool -= dt;
+  if (dyn.acc < 1.5 || dyn.cool > 0) return;
+  const avg = dyn.acc / dyn.n, period = dyn.mn; dyn.acc = 0; dyn.n = 0; dyn.mn = 1;
+  let k = dyn.scale;
+  if (avg > Math.max(0.024, period * 1.45) && k > 0.55) {
+    k = Math.max(0.55, k - 0.15);
+    if (dyn.t - dyn.upAt < 5) dyn.hold = Math.min(60, dyn.hold * 2);   // the last step up didn't hold: wait longer next time
+  } else if (avg < period * 1.12 && k < 1 && dyn.t - dyn.upAt > dyn.hold) { k = Math.min(1, k + 0.1); dyn.upAt = dyn.t; }
+  if (k !== dyn.scale) { dyn.scale = k; dyn.cool = 2; renderer.setPixelRatio(dyn.base * k); resize(); }
+}
+if (!MANUAL) {
+  let last = performance.now(), failed = false;
+  const loop = (now) => {
+    requestAnimationFrame(loop);
+    const dt = Math.min((now - last) / 1000, 0.25); last = now;
+    try { frame(dt); } catch (e) { if (!failed) { failed = true; console.error(e); } }
+    if (mode !== 'title' || clock > 3) govern(dt);
+  };
+  requestAnimationFrame(loop);
+}
 
 /* ================================ test hooks ================================ */
 // Used by tools/play.mjs to fly the game with real key presses at a fixed frame rate.
@@ -1099,7 +1374,7 @@ window.__astra = {
   step(dt, draw = true) { frame(dt, draw); },
   state() {
     const { f, r, u } = player.axes();
-    return { mode, paused, inverted, muted, t: +simTime.toFixed(3), pos: vec(player.pos), vel: vec(player.vel), speed: +player.vel.length().toFixed(2), fwd: vec(f), right: vec(r), up: vec(u),
+    return { mode, paused, inverted, muted, difficulty: D.key, t: +simTime.toFixed(3), pos: vec(player.pos), vel: vec(player.vel), speed: +player.vel.length().toFixed(2), fwd: vec(f), right: vec(r), up: vec(u),
       ang: vec(player.ang), bank: +player.bank.toFixed(3), boostE: +player.boostE.toFixed(3), boosting: player.boosting, hull: +player.hull.toFixed(1), alive: player.alive,
       score: run.score, passes: run.passes, closest: isFinite(run.closest) ? +run.closest.toFixed(2) : null, hits: run.hits, streak: run.streak,
       camYaw: +cam.yaw.toFixed(3), camPitch: +cam.pitch.toFixed(3), camPos: vec(camera.position), fov: +camera.fov.toFixed(2),
@@ -1107,12 +1382,25 @@ window.__astra = {
   },
   rocks(maxDist) {                                  // rocks near the player, in the player's frame: x right, y up, z ahead
     const { f, r, u } = player.axes(), out = [];
-    ROCKS.forEach((R, i) => { const d = V3().subVectors(R.c, player.pos); const L = d.length(); if (L > maxDist) return; out.push({ i, x: +d.dot(r).toFixed(2), y: +d.dot(u).toFixed(2), z: +d.dot(f).toFixed(2), s: +R.s.toFixed(2), reach: +R.reach.toFixed(2), gap: +(gapTo(R, player.pos)).toFixed(2) }); });
+    const hp2 = V3();
+    ROCKS.forEach((R, i) => {
+      const d = V3().subVectors(R.c, player.pos); const L = d.length(); if (L > maxDist) return;
+      const gap = gapTo(R, player.pos);
+      let pgap = gap;                                // nearest hull probe to the surface (what a collision would see)
+      if (gap < 45) { pgap = Infinity; for (const S of SAMPLES) { hp2.copy(S.p).applyQuaternion(player.qv).add(player.pos); pgap = Math.min(pgap, probeGap(R, hp2, S.r, pn)); } }
+      out.push({ i, x: +d.dot(r).toFixed(2), y: +d.dot(u).toFixed(2), z: +d.dot(f).toFixed(2), s: +R.s.toFixed(2), reach: +R.reach.toFixed(2), gap: +gap.toFixed(2), pgap: +pgap.toFixed(2), gauntlet: !!R.gauntlet });
+    });
     return out;
   },
   events(from = 0) { return EVENTS.slice(from); },
+  surf(i, ux, uy) {                                 // rock i's surface radius on the side (ux right, uy up) of the player's frame
+    const R = ROCKS[i], { r, u } = player.axes(), d = V3().addScaledVector(r, ux).addScaledVector(u, uy).normalize().applyQuaternion(R.qi);
+    return +(surfR(R.S, d.x, d.y, d.z) * R.s).toFixed(2);
+  },
   vega() { const { f, r, u } = player.axes(), d = V3().subVectors(wing.pos, player.pos); return { ...aiDbg, speed: +wing.vel.length().toFixed(1), boostE: +wing.boostE.toFixed(2), boosting: wing.boosting, rel: [+d.dot(r).toFixed(1), +d.dot(u).toFixed(1), +d.dot(f).toFixed(1)], inp: { ...wing.inp }, ang: [wing.ang.x, wing.ang.y].map((v) => +v.toFixed(2)) }; },
-  info() { let tris = 0; rockMeshes.forEach((m) => { tris += (m.geometry.attributes.position.count / 3) * m.count; }); return { rocks: ROCKS.length, rockTris: tris, calls: renderer.info.render.calls, tris: renderer.info.render.triangles }; },
+  info() { let tris = 0; rockMeshes.forEach((L) => L.forEach((m) => { tris += (m.geometry.index.count / 3) * m.count; })); return { rocks: ROCKS.length, rockTris: tris, lods: lodCount.map((c) => c.slice()), calls: renderer.info.render.calls, tris: renderer.info.render.triangles, msaa: Q.msaa, pr: Q.pr }; },
+  ready: true,
 };
+$('bLaunch').disabled = false; $('bLaunch').textContent = 'LAUNCH';
 })();
 </script>

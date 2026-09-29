@@ -1,0 +1,12 @@
+Fonts used to paint the ship's stencils and decals (blender/ship_tex.py). They are only read offline, to
+rasterise text into the textures; the game itself does not load them.
+
+stencil-bold.ttf, stencil-semibold.ttf
+  Static instances of Big Shoulders Stencil (variable font), Copyright 2019 The Big Shoulders Project
+  Authors. SIL Open Font License 1.1: see OFL-BigShoulders.txt.
+
+cond-medium.ttf, cond-semibold.ttf, mono-semibold.ttf
+  Modified versions (static instances) of IBM Plex Sans Condensed and IBM Plex Mono, Copyright 2017-2019
+  IBM Corp., with Reserved Font Name "Plex". As the licence requires of a Modified Version, they are
+  renamed (Astra Sans Condensed, Astra Mono) and do not use the Reserved Font Name. SIL Open Font
+  License 1.1: see OFL-IBMPlex.txt.

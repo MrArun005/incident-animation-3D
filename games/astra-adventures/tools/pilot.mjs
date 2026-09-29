@@ -1,15 +1,16 @@
 // Claude flies Astra Adventures. A closed-loop pilot that plays the way a person does: it looks at the rocks
 // ahead, picks one, lines up a close pass with the arrow keys, fine-tunes with A/D, boosts on the straights
 // and dodges anything else in the way. Every input is a real key press through the browser.
-//   node tools/pilot.mjs [--record out.mp4] [--seconds 70] [--width 1600 --height 900]
+//   node tools/pilot.mjs [--record out.mp4] [--seconds 70] [--width 1600 --height 900] [--hard]
 import fs from 'node:fs';
 import { spawn } from 'node:child_process';
 import { open } from './harness.mjs';
 
 const arg = (k, d) => { const i = process.argv.indexOf('--' + k); return i < 0 ? d : process.argv[i + 1]; };
 const RECORD = arg('record', null), SECONDS = +arg('seconds', 70), W = +arg('width', 1280), H = +arg('height', 720);
+const HARD = process.argv.includes('--hard'), LOG = arg('log', null);
 const FFMPEG = '/home/user/incident-animation-3d/cartoons/node_modules/ffmpeg-static/ffmpeg';
-const g = await open({ width: W, height: H });
+const g = await open({ width: W, height: H, storage: { 'astra-hard': HARD ? '1' : '0' } });
 const { page, state } = g;
 const rocks = (d) => page.evaluate((d) => window.__astra.rocks(d), d);
 
@@ -48,7 +49,9 @@ for (let f = 0; f < SECONDS * 30; f++) {
       const r = cand[0], lx = -r.x, ly = -r.y, L = Math.hypot(lx, ly) || 1;
       // pass on the side we're already on; horizontal passes leave room for the wing
       let ux = lx / L, uy = ly / L; if (L < 3) { ux = -1; uy = 0; }
-      target = { ...r, ux, uy, clearance: 3.6 + 5.2 * Math.abs(ux) + (stats.picks % 3 === 2 ? -0.9 : 0) }; lastPick = t; stats.picks++;
+      // on hard, thread them tighter: every third pass is a knife-edge
+      const base = HARD ? 2.7 + 5.0 * Math.abs(ux) : 3.6 + 5.2 * Math.abs(ux);
+      target = { ...r, ux, uy, clearance: base + (stats.picks % 3 === 2 ? (HARD ? -1.0 : -0.9) : 0) }; lastPick = t; stats.picks++;
     }
   }
   const want = new Set();
@@ -63,8 +66,9 @@ for (let f = 0; f < SECONDS * 30; f++) {
     const miss = Math.hypot(r.x, r.y), need = r.reach + 8;
     if (miss < need) { aimX = -r.x / Math.max(miss, 0.1) * need * 1.6; aimY = -r.y / Math.max(miss, 0.1) * need * 1.6; aimZ = r.z; dodge = true; break; }
   }
+  if (target) target.sr = await page.evaluate(([i, ux, uy]) => window.__astra.surf(i, ux, uy), [target.i, target.ux, target.uy]);
   if (!dodge && target) {
-    const off = target.s * 1.08 + target.clearance;
+    const off = target.sr + target.clearance;
     aimX = target.x + target.ux * off; aimY = target.y + target.uy * off; aimZ = Math.max(target.z, 25);
   }
   const yawErr = Math.atan2(aimX, aimZ), pitchErr = Math.atan2(aimY, Math.hypot(aimX, aimZ));
@@ -73,18 +77,19 @@ for (let f = 0; f < SECONDS * 30; f++) {
   if (pp > 0.012) want.add('ArrowUp'); else if (pp < -0.012) want.add('ArrowDown');
   // Final 90 m: slide with A/D to trim the line instead of yawing.
   if (!dodge && target && target.z < 90 && target.z > 0) {
-    const ex = target.x + target.ux * (target.s * 1.08 + target.clearance);
+    const ex = target.x + target.ux * (target.sr + target.clearance);
     want.delete('ArrowRight'); want.delete('ArrowLeft');
     if (ex > 0.6) want.add('KeyD'); else if (ex < -0.6) want.add('KeyA');
   }
   // Boost on long clear runs.
-  const clearRun = !target || target.z > 250;
+  const clearRun = !target || target.z > (HARD ? 320 : 250);
   if (clearRun && !dodge && Math.abs(yawErr) < 0.08 && Math.abs(pitchErr) < 0.08 && s.boostE > 0.35) want.add('Shift');
   // Two set pieces: a look round at Vega mid-flight, and a burst of the wing guns at a far rock.
-  const lookAround = t > 31 && t < 34.5;
+  // look round at the ship mid-flight, and (on hard) back at Vega late on
+  const lookAround = (t > 31 && t < 34.5) || (HARD && t > 58 && t < 61);
   if (t > 46 && t < 47.2) want.add('Space');
   await keys(want);
-  if (lookAround) { const k = (t - 31) / 3.5, x = W * (0.72 - Math.sin(Math.min(1, k * 1.6) * Math.PI / 2) * 0.5); if (!page.__drag) { await page.mouse.move(W * 0.72, H * 0.45); await page.mouse.down(); page.__drag = true; } await page.mouse.move(x, H * 0.45 - Math.sin(k * Math.PI) * 40); }
+  if (lookAround) { const k = ((t > 50 ? t - 58 : t - 31) / (t > 50 ? 3 : 3.5)), x = W * (0.72 - Math.sin(Math.min(1, k * 1.6) * Math.PI / 2) * 0.5); if (!page.__drag) { await page.mouse.move(W * 0.72, H * 0.45); await page.mouse.down(); page.__drag = true; } await page.mouse.move(x, H * 0.45 - Math.sin(k * Math.PI) * 40); }
   else if (page.__drag) { await page.mouse.up(); page.__drag = false; }
   const st = await frame(f);
   if (f % 30 === 0) log.push(`t=${t.toFixed(0)}s ${st.speed.toFixed(0)} m/s hull ${st.hull} score ${st.score} passes ${st.passes} closest ${st.closest} vega ${st.wing.dist} m ${dodge ? 'DODGE' : target ? `target z=${target.z.toFixed(0)} s=${target.s}` : 'cruising'}`);
@@ -96,7 +101,7 @@ await page.keyboard.press('KeyP'); for (let i = 0; i < 10; i++) await frame(0);
 
 const s = await state(), ev = await page.evaluate(() => window.__astra.events(0));
 if (ff) { ff.stdin.end(); await new Promise((r) => ff.on('close', r)); }
-fs.writeFileSync(RECORD ? RECORD.replace(/\.mp4$/, '.json') : '/tmp/claude-0/pilot-run.json', JSON.stringify({ frames, events: ev, final: s }));
+fs.writeFileSync(LOG || (RECORD ? RECORD.replace(/\.mp4$/, '.json') : '/tmp/claude-0/pilot-run.json'), JSON.stringify({ frames, events: ev, final: s }));
 console.log(log.filter((_, i) => i % 3 === 0).join('\n'));
 const passes = ev.filter((e) => e.type === 'pass');
 console.log(`\n${SECONDS}s flown: ${passes.length} close passes, closest ${s.closest} m, score ${s.score}, ${s.hits} hits (hull ${s.hull}%), ${ev.filter((e) => e.type === 'breach').length} breaches, ${stats.picks} rocks lined up`);
