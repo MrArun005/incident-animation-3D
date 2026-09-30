@@ -280,6 +280,16 @@ class Part:
         self.nv += len(verts)
         return self
 
+    def absorb(self, other):
+        """Append another Part's pieces (faces, kinds and panel coordinates) to this one."""
+        for V, PP in zip(other.V, other.PP):
+            self.V.append(V)
+            self.PP.append(PP)
+        self.F += [[self.nv + i for i in f] for f in other.F]
+        self.K += list(other.K)
+        self.nv += other.nv
+        return self
+
     def mirrored(self, name, part_id):
         """A copy mirrored across X (left <-> right), windings reversed so normals stay outward."""
         m = Part(name, part_id)

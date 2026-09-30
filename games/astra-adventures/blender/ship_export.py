@@ -13,6 +13,9 @@ args = sys.argv[1:]
 OUT = os.path.abspath(args[args.index('--out') + 1]) if '--out' in args else os.path.join(HERE, '..', 'assets')
 SIZE = int(args[args.index('--size') + 1]) if '--size' in args else 2048
 BUMP = float(args[args.index('--bump') + 1]) if '--bump' in args else 6.0
+# The ship is modelled at 1:1 of the original design and exported larger: a heavier fighter that fills more of
+# the frame. Geometry and every gameplay anchor (engines, guns, collision probes) scale together.
+SCALE = float(args[args.index('--scale') + 1]) if '--scale' in args else 1.3
 B = os.path.join(HERE, 'build')
 os.makedirs(OUT, exist_ok=True)
 t0 = time.time()
@@ -158,6 +161,10 @@ hm_ = bpy.data.objects['Hull'].data
 for attr in ('kind', 'pp'):
     if attr in hm_.attributes:
         hm_.attributes.remove(hm_.attributes[attr])
+from mathutils import Matrix
+for o in bpy.data.objects:
+    if o.type == 'MESH':
+        o.data.transform(Matrix.Scale(SCALE, 4))
 bpy.ops.object.select_all(action='SELECT')
 glb = os.path.join(OUT, 'jupiter.glb')
 bpy.ops.export_scene.gltf(filepath=glb, export_format='GLB', export_image_format='JPEG', export_jpeg_quality=90,
@@ -168,5 +175,13 @@ im = Image.open(os.path.join(B, 'tex_albedo_vega.png'))
 if im.size[0] != SIZE:
     im = im.resize((SIZE, SIZE), Image.LANCZOS)
 im.convert('RGB').save(os.path.join(OUT, 'jupiter-vega.jpg'), quality=90, optimize=True)
-shutil.copy(os.path.join(B, 'anchors.json'), os.path.join(OUT, 'jupiter.json'))
+anc = json.load(open(os.path.join(B, 'anchors.json')))
+sc3 = lambda v: [round(c * SCALE, 3) for c in v]
+anc['scale'] = SCALE
+for k in ('engines', 'engineThroats', 'guns'):
+    anc[k] = [sc3(v) for v in anc[k]]
+anc['engineR'] = [round(r * SCALE, 3) for r in anc['engineR']]
+anc['nav'] = {k: sc3(v) for k, v in anc['nav'].items()}
+anc['samples'] = [dict(q, p=sc3(q['p']), r=round(q['r'] * SCALE, 3)) for q in anc['samples']]
+json.dump(anc, open(os.path.join(OUT, 'jupiter.json'), 'w'), indent=1)
 print(f'exported {glb}: {os.path.getsize(glb) / 1e6:.1f} MB ({time.time() - t0:.0f}s)')

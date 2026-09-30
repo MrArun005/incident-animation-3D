@@ -22,7 +22,10 @@ numpy/scipy/Pillow:
   from rounded sections, a bubble canopy with frame, pilot and seat, side scoops, dorsal spine with vents
   and an antenna, faceted wings and a lower strut into the nacelles, intakes with fan blades, nozzles with
   petals, plugs and heat-stained bells, guns with shrouds and muzzle brakes, canted fins, keel, pitot, nav
-  lights (~44k triangles). `ship_bake.py` unwraps it (smart project + a skyline packer, texel density by
+  lights, and the stores: a rocket pod on each wing, twin missiles and a drop tank under each wing, canard
+  foreplanes, a chin sensor turret, a spine sensor dome, whip antennas and RCS thruster blocks (~66k
+  triangles; exported at 1.3x the design size, anchors and probes scaled with it). Two-tone liveries: Lead
+  crimson and white with yellow trim, Vega navy and white with light-blue trim, grey bellies. `ship_bake.py` unwraps it (smart project + a skyline packer, texel density by
   surface kind) and bakes position, normal, panel coordinates, edge and occlusion buffers at 4K.
   `ship_tex.py` paints from those buffers in 3D / panel space so nothing breaks at UV seams: worn white
   panels with per-panel tint, yellow markings and hazard stripes, panel lines, rivets and hatches, stencils
@@ -55,7 +58,7 @@ resolution for frame rate. Phones get half-size textures (ship, rocks and sky) a
 - The velocity keeps pointing where you were going and bleeds into the new heading (`driftTau` 0.95 s).
 - Speed changes are acceleration-limited: boost takes ~2 s to reach 108 m/s and ~3 s to die away.
 - The chase camera trails the ship's rotation and gets shoved by acceleration.
-- Close passes are measured against the drawn rock surface from 52 probes fitted to the hull (nose and
+- Close passes are measured against the drawn rock surface from 68 probes fitted to the hull (nose and
   pitot, body, nacelles, gun barrels, wings, fins), so a wingtip skim counts. Gaps and contact normals use
   the rock's true surface normal (differenced from its radial table), so a glancing scrape along a sloping
   face stays a scrape. Feedback: whoosh panned to the rock's side, camera

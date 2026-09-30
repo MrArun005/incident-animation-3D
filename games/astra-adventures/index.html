@@ -649,6 +649,7 @@ function probeGap(R, p, r, n) {
 // each nacelle, three engines. Ship axes: +X right, +Y up, -Z forward. The engine exits, muzzles and
 // collision probes ship with the model (jupiter.json), so gameplay and geometry can't drift apart.
 const SI = assets.shipInfo;
+const SS = SI.scale || 1;                          // the model's export scale; hard-coded ship offsets follow it
 const ENGINE_POS = SI.engines.map((p) => V3(...p));
 const ENGINE_R = SI.engineR.slice();
 const GUNS = SI.guns.map((p) => V3(...p));
@@ -686,7 +687,7 @@ class Plume {
     const put = (x, y, z, size, r, g, b) => { this.pos.setXYZ(j, x, y, z); this.size.setX(j, size); this.col.setXYZ(j, r, g, b); j++; };
     ENGINE_POS.forEach((E, e) => {
       const R = ENGINE_R[e], I = (0.55 + thr * 1.6 + bst * 2.6) * on;
-      const len = (1.3 + thr * 3.2 + bst * 6.5) * (1 + 0.05 * Math.sin(t * 37 + e * 2.1)) * (e === 0 ? 1.1 : 1);
+      const len = (1.3 + thr * 3.2 + bst * 6.5) * SS * (1 + 0.05 * Math.sin(t * 37 + e * 2.1)) * (e === 0 ? 1.1 : 1);
       const nd = 3.2 + bst * 1.8;
       for (let k = 0; k < PUFFS; k++) {
         const u = k / (PUFFS - 1), z = E.z + 0.05 + len * Math.pow(u, 1.2);
@@ -716,8 +717,8 @@ function buildShip(livery) {
   for (const n of ['Hull', 'Glass', 'GlowC', 'GlowL', 'GlowR', 'Beacon', 'StrobeL', 'StrobeR']) if (!parts[n]) throw new Error(`the ship model has no ${n}`);
   g.add(model);
   const plume = new Plume(L); g.add(plume.mesh);
-  const light = new T.PointLight(L.edge.getHex(), 1, 15, 2); light.position.set(0, 0.6, 7.6); g.add(light);
-  const muzzles = GUNS.map((p) => { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: new T.Color(4, 3.2, 1.8), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.position.copy(p); s.scale.set(2.6, 2.6, 1); s.visible = false; g.add(s); return s; });
+  const light = new T.PointLight(L.edge.getHex(), 1, 15 * SS, 2); light.position.set(0, 0.6 * SS, 7.6 * SS); g.add(light);
+  const muzzles = GUNS.map((p) => { const s = new T.Sprite(new T.SpriteMaterial({ map: glowTex, color: new T.Color(4, 3.2, 1.8), blending: T.AdditiveBlending, depthWrite: false, transparent: true })); s.position.copy(p); s.scale.set(2.6 * SS, 2.6 * SS, 1); s.visible = false; g.add(s); return s; });
   return { g, plume, light, muzzles, livery: L, glowDiscs: ['GlowC', 'GlowL', 'GlowR'].map((n) => parts[n]), beacon: parts.Beacon, strobes: [parts.StrobeL, parts.StrobeR] };
 }
 
@@ -1020,7 +1021,7 @@ function finishEnc(i) { const e = enc.get(i); enc.delete(i); if (e && !e.fired &
 // been thrown well off it, towards a point ahead of you on your own path), limited to what a Jupiter can do:
 // top speed, 70 m/s² of thrust and a turn-rate cap. Her ship turns to face where she is going, banks into her
 // acceleration, and she looks 3 s down her path to swing wide of rock.
-const SLOT = V3(17, 2.5, -3);
+const SLOT = V3(17, 2.5, -3).multiplyScalar(SS);
 const aiV = { slot: V3(), sv: V3(), om: V3(), vd: V3(), d: V3(), cl: V3(), tmp: V3(), a: V3(), m: new T.Matrix4(), q: new T.Quaternion(), up: V3(), f: V3(), r: V3() };
 const aiDbg = {};
 function wingAI(w, lead, h) {
@@ -1218,12 +1219,12 @@ const cv = { off: V3(), f: V3(), u: V3(), r: V3(), tgt: V3(), oq: new T.Quaterni
 function updateCamera(dt, simDt) {
   const s = player;
   if (mode === 'title') {                            // a slow walk-round of both ships
-    const a = clock * 0.12 + 0.9, R = 25;
-    camera.position.set(s.pos.x + 4 + Math.sin(a) * R, s.pos.y + 7 + Math.sin(clock * 0.3) * 1.5, s.pos.z + 1 + Math.cos(a) * R);
+    const a = clock * 0.12 + 0.9, R = 25 * SS;
+    camera.position.set(s.pos.x + 4 * SS + Math.sin(a) * R, s.pos.y + 7 * SS + Math.sin(clock * 0.3) * 1.5, s.pos.z + SS + Math.cos(a) * R);
     camera.up.set(0, 1, 0);
     const wide = window.innerWidth > 820;
-    cv.tgt.set(s.pos.x + 4, s.pos.y, s.pos.z + 1); camera.lookAt(cv.tgt);
-    if (wide) { cv.r.set(1, 0, 0).applyQuaternion(camera.quaternion); cv.tgt.addScaledVector(cv.r, -12); camera.lookAt(cv.tgt); }
+    cv.tgt.set(s.pos.x + 4 * SS, s.pos.y, s.pos.z + SS); camera.lookAt(cv.tgt);
+    if (wide) { cv.r.set(1, 0, 0).applyQuaternion(camera.quaternion); cv.tgt.addScaledVector(cv.r, -12 * SS); camera.lookAt(cv.tgt); }
     camera.fov = 46; camera.updateProjectionMatrix(); return;
   }
   // The camera trails the ship's rotation: turn, and for a moment you see her side before it catches up.
@@ -1235,13 +1236,13 @@ function updateCamera(dt, simDt) {
   const accLocal = cam.acc.clone().applyQuaternion(cv.oq.copy(cam.q).invert()).multiplyScalar(-0.012);
   accLocal.clampLength(0, 2.2); cam.lag.lerp(accLocal, 1 - Math.exp(-dt * 3));
   const portrait = Math.max(0, 1 - camera.aspect);                              // 0 on a landscape screen
-  cv.off.set(0, 5.0 + s.boostVis * 0.6, (25 + s.boostVis * 4.5) * (1 + portrait * 0.7)).add(cam.lag);
+  cv.off.set(0, 5.6 + s.boostVis * 0.6, (25 + s.boostVis * 4.5) * (1 + portrait * 0.7)).add(cam.lag);
   cv.oq.setFromEuler(cv.e.set(cam.pitch, cam.yaw, 0, 'YXZ'));
   cv.off.applyQuaternion(cv.oq).applyQuaternion(cam.q);
   const sh = fx.shake * fx.shake;
   cv.shake.set(Math.sin(clock * 41) * 0.6 + Math.sin(clock * 67 + 1) * 0.4, Math.sin(clock * 37 + 2) * 0.6 + Math.sin(clock * 73) * 0.4, 0).multiplyScalar(sh * 0.42);
   camera.position.copy(s.pos).add(cv.off);
-  { const dv = camera.position.distanceTo(wing.pos); if (dv < 12) camera.position.addScaledVector(cv.push.subVectors(camera.position, wing.pos).normalize(), 12 - dv); }
+  { const dv = camera.position.distanceTo(wing.pos); if (dv < 12 * SS) camera.position.addScaledVector(cv.push.subVectors(camera.position, wing.pos).normalize(), 12 * SS - dv); }
   cv.f.set(0, 0, -1).applyQuaternion(cam.q); cv.u.set(0, 1, 0).applyQuaternion(cam.q);
   cv.tgt.copy(s.pos).addScaledVector(cv.f, 30 * (1 - orbit)).addScaledVector(cv.u, 2.4 * (1 - orbit));
   camera.up.copy(cv.u).applyAxisAngle(cv.f, s.bank * 0.28 * (1 - orbit));

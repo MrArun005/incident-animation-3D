@@ -17,8 +17,10 @@ import ship_geo as G
 B = os.path.join(HERE, 'build')
 FONT = {k: os.path.join(HERE, 'fonts', f'{k}.ttf') for k in ('stencil-bold', 'stencil-semibold', 'mono-semibold',
                                                              'cond-semibold', 'cond-medium')}
-LIVERIES = {'lead': {'mark': (0.94, 0.70, 0.13), 'num': '07', 'call': 'LEAD'},
-            'vega': {'mark': (0.22, 0.52, 0.93), 'num': '12', 'call': 'VEGA'}}
+# Two-tone liveries: a bold primary colour on the nose, spine, fins, foreplanes, pods and nacelle bands over
+# white, a trim colour for stripes and stencils, and a grey belly.
+LIVERIES = {'lead': {'mark': (0.96, 0.72, 0.12), 'prim': (0.66, 0.07, 0.06), 'num': '07', 'call': 'LEAD'},
+            'vega': {'mark': (0.40, 0.72, 1.00), 'prim': (0.07, 0.15, 0.42), 'num': '12', 'call': 'VEGA'}}
 T0 = time.time()
 
 
@@ -607,6 +609,30 @@ def build(livery):
     # helmet stripe
     helm = (PART == 3) & (KIND == 0)
     mark = np.maximum(mark, helm * (np.abs(X) < 0.03))
+    # ---------------- primary colour blocks and the grey belly (under the markings)
+    ax_ = np.abs(X)
+    prim = np.zeros((RES, RES), np.float32)
+    nose_edge = 4.55 + 0.35 * np.clip(np.abs(Z) / 0.6, 0, 1)                   # a swept break line
+    prim = np.maximum(prim, fus * sstep(nose_edge, nose_edge + AA, Y))
+    prim = np.maximum(prim, (PART == 4) & (KIND == 0))                          # spine
+    prim = np.maximum(prim, ((PART == 11) | (PART == 20) | (PART == 13)) * 1.0)  # fins, ventral
+    prim = np.maximum(prim, ((PART == 22) | (PART == 27)) * 1.0)                # foreplanes
+    prim = np.maximum(prim, ((PART == 29) | (PART == 31)) * 1.0)                # rocket pods
+    prim = np.maximum(prim, nac * (sstep(-0.95, -0.95 + AA, U) * (1 - sstep(0.76 - AA, 0.76, U)) + (1 - sstep(-3.53, -3.53 + AA, U))))
+    prim = np.maximum(prim, wg * sstep(4.40, 4.40 + AA, ax_))                   # wing tips outboard of the band
+    tank = ((PART == 21) | (PART == 26)) & (np.abs(ax_ - G.TANK_X) < G.TANK_R + 0.02) & (Z < G.TANK_Z + G.TANK_R + 0.02)
+    prim = np.maximum(prim, tank * sstep(0.45, 0.45 + AA, Y))                   # drop-tank noses
+    msl = ((PART == 21) | (PART == 26)) & (np.abs(ax_ - G.MSL_X) < G.MSL_DX + G.MSL_R + 0.3) & (Z < G.MSL_Z + G.MSL_R + 0.02) & ~tank
+    mark = np.maximum(mark, msl * sstep(G.MSL_Y0 - 0.66, G.MSL_Y0 - 0.66 + AA, Y) * (1 - sstep(G.MSL_Y0 - 0.54 - AA, G.MSL_Y0 - 0.54, Y)))
+    pod = (PART == 29) | (PART == 31)
+    hzp = pod * sstep(0.20, 0.20 + AA, Y) * (1 - sstep(0.42 - AA, 0.42, Y))
+    pstripes = ((Y + X * 1.0 + Z) / 0.14) % 1.0 < 0.5
+    mark = np.maximum(mark, hzp * pstripes)
+    black = np.maximum(black, hzp * ~pstripes)
+    belly = (NZ < -0.30) & (fus | wg | nac | ((PART == 7) | (PART == 17)))
+    belly_k = belly * sstep(-0.30, -0.45, NZ)
+    prim *= paint
+    belly_k = belly_k * paint * (1 - prim)
     # ---------------- stencils
     lay = livery_layers(L)
     mark *= paint
@@ -616,6 +642,10 @@ def build(livery):
     col = alb
     pm = paint[..., None]
     col = np.where(pm, col, col)
+    PRIM = srgb2lin(L['prim'])
+    col = col * (1 - prim[..., None]) + PRIM[None, None] * (1 + 0.06 * N_big[..., None] + 0.03 * (pvar - 0.5)[..., None]) * prim[..., None]
+    col = col * (1 - belly_k[..., None]) + srgb2lin((0.38, 0.40, 0.42))[None, None] * (1 + 0.05 * N_big[..., None]) * belly_k[..., None]
+    rough = np.where(paint, rough * (1 - prim) + 0.38 * prim, rough)
     col = col * (1 - mark[..., None]) + MARK[None, None] * (1 + 0.04 * N_big[..., None]) * mark[..., None]
     col = col * (1 - black[..., None]) + srgb2lin((0.07, 0.07, 0.075))[None, None] * black[..., None]
     col = col * (1 - antiglare[..., None]) + srgb2lin((0.20, 0.21, 0.22))[None, None] * antiglare[..., None]

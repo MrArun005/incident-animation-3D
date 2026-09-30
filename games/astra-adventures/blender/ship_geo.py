@@ -622,6 +622,209 @@ def nose_bits():
     return p
 
 
+# ------------------------------------------------------------------ stores and accessories
+MSL_X, MSL_Z = 3.05, -0.52         # rack centre under each wing
+MSL_DX = 0.27                      # the two rounds sit either side of the pylon
+MSL_R, MSL_Y0, MSL_Y1 = 0.15, 1.40, -1.95
+TANK_X, TANK_Z, TANK_R = 1.92, -0.56, 0.25
+
+
+def missile(p, cx, cz):
+    """One round: ogive nose (warhead band), body, a sensor ring, four swept tail fins set at 45 degrees and a
+    dark nozzle. Lathed along +Y (forward)."""
+    r = MSL_R
+    prof = [(MSL_Y0, 0.0, 'dark'), (MSL_Y0 - 0.06, 0.035, 'dark'), (MSL_Y0 - 0.20, 0.075, 'paint'),
+            (MSL_Y0 - 0.42, 0.105, 'paint'), (MSL_Y0 - 0.62, r, 'paint'), (MSL_Y0 - 0.70, r * 1.03, 'dark'),
+            (MSL_Y0 - 0.74, r, 'paint'), (MSL_Y1 + 0.18, r, 'paint'), (MSL_Y1 + 0.06, r * 0.88, 'dark'),
+            (MSL_Y1, r * 0.72, 'heat'), (MSL_Y1, r * 0.50, 'black'), (MSL_Y1 + 0.10, 0.0, 'black')]
+    V, F, PP, row = lathe([(y, rr) for y, rr, k in prof], 20, center=(cx, cz), rref=r)
+    p.add(V, F, pp=PP, kinds=[prof[i][2] for i in row])
+    for k in range(4):
+        a = math.radians(45 + 90 * k)
+        d = np.array([math.cos(a), 0, math.sin(a)])
+        t = np.array([-math.sin(a), 0, math.cos(a)])
+        base = np.array([cx, 0, cz]) + d * (r * 0.9)
+        root = (base + [0, MSL_Y1 + 0.62, 0], base + [0, MSL_Y1 + 0.10, 0])
+        tip = (base + d * 0.26 + [0, MSL_Y1 + 0.30, 0], base + d * 0.26 + [0, MSL_Y1 + 0.10, 0])
+        p.absorb(fin_loft(root, tip, d, t, 0.022, 0.014, 'mfin', p.id))
+    # forward canards, small
+    for k in range(4):
+        a = math.radians(45 + 90 * k)
+        d = np.array([math.cos(a), 0, math.sin(a)])
+        t = np.array([-math.sin(a), 0, math.cos(a)])
+        base = np.array([cx, 0, cz]) + d * (r * 0.92)
+        root = (base + [0, MSL_Y0 - 0.80, 0], base + [0, MSL_Y0 - 1.02, 0])
+        tip = (base + d * 0.11 + [0, MSL_Y0 - 0.92, 0], base + d * 0.11 + [0, MSL_Y0 - 1.02, 0])
+        p.absorb(fin_loft(root, tip, d, t, 0.014, 0.01, 'mcan', p.id))
+
+
+def stores():
+    """Right-hand weapons pylon under the wing: a swept pylon, a twin rack beam with sway braces, two rounds."""
+    p = Part('stores', 21)
+    x = MSL_X
+    le, te = wing_le(x), wing_te(x)
+    zw = NAC_Z - 0.028 * (le - te) + 0.02                     # just inside the wing's lower skin
+    rings = []
+    for z, y0, y1 in ((zw, 0.35, -1.55), (MSL_Z + MSL_R + 0.10, 0.10, -1.35)):
+        sec = rrect(0.055, (y0 - y1) / 2, 0.045, 5)
+        rings.append(np.stack([x + sec[:, 0], (y0 + y1) / 2 + sec[:, 1], np.full(len(sec), z)], 1))
+    R = np.stack(rings)
+    m, n, _ = R.shape
+    V = R.reshape(-1, 3)
+    F = grid_faces(m, n, True)
+    V = np.concatenate([V, [R[0].mean(0), R[-1].mean(0)]])
+    F += fan(len(V) - 2, list(range(n)), V, [0, 0, 1])
+    F += fan(len(V) - 1, list(range((m - 1) * n, m * n)), V, [0, 0, -1])
+    V, F = solid(V, F)
+    p.add(V, F, pp=np.stack([V[:, 1], V[:, 2]], 1))
+    # rack beam and sway braces
+    zr = MSL_Z + MSL_R + 0.06
+    V, F, PP = rbox((x, -0.40, zr), (2 * MSL_DX + 0.10, 1.40, 0.07), 0.02)
+    p.add(V, F, kind='dark', pp=PP)
+    for y in (0.05, -0.85):
+        for sgn in (1, -1):
+            V, F, PP = rbox((x + sgn * (MSL_DX - 0.05), y, zr - 0.07), (0.035, 0.05, 0.10), 0.01, 2)
+            p.add(V, F, kind='dark', pp=PP)
+    for sgn in (1, -1):
+        missile(p, x + sgn * MSL_DX, MSL_Z)
+    # inboard drop tank on its own pylon
+    xt = TANK_X
+    zw = NAC_Z - 0.028 * (wing_le(xt) - wing_te(xt)) + 0.02
+    V, F, PP = rbox((xt, -0.30, (zw + TANK_Z + TANK_R) / 2), (0.10, 1.5, zw - TANK_Z - TANK_R + 0.06), 0.035)
+    p.add(V, F, pp=PP)
+    r, y0, y1 = TANK_R, 1.30, -2.05
+    prof = [(y0, 0.0), (y0 - 0.12, r * 0.42), (y0 - 0.45, r * 0.82), (y0 - 0.9, r), (y1 + 0.9, r),
+            (y1 + 0.84, r * 1.02), (y1 + 0.78, r), (y1 + 0.35, r * 0.78), (y1 + 0.08, r * 0.30), (y1, 0.0)]
+    kinds = ['paint', 'paint', 'paint', 'paint', 'dark', 'dark', 'paint', 'paint', 'dark']
+    V, F, PP, row = lathe(prof, 24, center=(xt, TANK_Z), rref=r)
+    p.add(V, F, pp=PP, kinds=[kinds[i] for i in row])
+    for k, a in enumerate((90, 210, 330)):                   # three small stabiliser fins on the tail cone
+        a = math.radians(a)
+        d = np.array([math.cos(a), 0, math.sin(a)])
+        t = np.array([-math.sin(a), 0, math.cos(a)])
+        base = np.array([xt, 0, TANK_Z]) + d * r * 0.55
+        root = (base + [0, y1 + 0.55, 0], base + [0, y1 + 0.12, 0])
+        tip = (base + d * 0.16 + [0, y1 + 0.28, 0], base + d * 0.16 + [0, y1 + 0.10, 0])
+        p.absorb(fin_loft(root, tip, d, t, 0.02, 0.012, 'tfin', p.id))
+    return p
+
+
+def canard():
+    """Right-hand foreplane on the chine ahead of the scoops."""
+    y_le, y_te = 4.72, 3.98
+    a, zc, *_ = fuse_params(4.35)
+    root = (np.array([fuse_side(zc, y_le) - 0.03, y_le, zc]), np.array([fuse_side(zc, y_te) - 0.03, y_te, zc]))
+    tip = (np.array([a + 0.78, 4.12, zc + 0.05]), np.array([a + 0.78, 3.90, zc + 0.05]))
+    return fin_loft(root, tip, unit([1.0, 0, 0.06]), np.array([0, 0, 1.0]), 0.07, 0.025, 'canard', 22)
+
+
+def chin_turret():
+    """A sensor ball under the nose: a gimbal fork, the ball and a dark lens facing forward."""
+    p = Part('chin', 23)
+    y = 5.55
+    zb = fuse_bot(0, y)
+    V, F, PP = rbox((0, y + 0.05, zb - 0.03), (0.22, 0.34, 0.10), 0.03)
+    p.add(V, F, kind='dark', pp=PP)
+    r = 0.15
+    c = (0, zb - 0.13 - r * 0.5)
+    prof = [(y + r, 0.0), (y + r * 0.92, r * 0.38), (y + r * 0.92, r * 0.52), (y + r * 0.7, r * 0.72),
+            (y + r * 0.35, r * 0.94), (y, r), (y - r * 0.5, r * 0.86), (y - r * 0.87, r * 0.5), (y - r, 0.0)]
+    kinds = ['black', 'dark', 'dark', 'paint', 'paint', 'paint', 'paint', 'paint']
+    V, F, PP, row = lathe(prof, 20, center=c, rref=r)
+    p.add(V, F, pp=PP, kinds=[kinds[i] for i in row])
+    return p
+
+
+def antennas():
+    """Twin whip antennas aft on the spine and a pitot-static probe pair under the nose."""
+    p = Part('antennas', 24)
+    for sgn in (1, -1):
+        y = -4.05
+        base = np.array([sgn * 0.12, y, spine_top(y) - 0.01])
+        path = np.array([base, base + [sgn * 0.05, -0.25, 0.45], base + [sgn * 0.09, -0.62, 0.80]])
+        V, F, PP = sweep(path, np.tile([1.0, 0, 0], (3, 1)), rrect(0.012, 0.012, 0.0118, 3))
+        V, F = solid(V, F)
+        p.add(V, F, kind='dark', pp=PP)
+        V, F, PP = rbox(tuple(base + [0, 0, 0.015]), (0.06, 0.09, 0.04), 0.012, 2)
+        p.add(V, F, kind='dark', pp=PP)
+    return p
+
+
+def rcs_quad(p, c, out):
+    """A reaction-control block: a rounded housing with three small nozzles pointing out, up and down."""
+    out = unit(out)
+    V, F, PP = rbox(tuple(c), (0.13, 0.20, 0.13) if abs(out[0]) > 0.5 else (0.13, 0.13, 0.13), 0.03)
+    p.add(V, F, kind='dark', pp=PP)
+    for d in (out, np.array([0, 0, 1.0]), np.array([0, 0, -1.0])):
+        tip = np.asarray(c) + d * 0.075
+        path = np.array([np.asarray(c) + d * 0.04, tip])
+        up = np.array([0, 1.0, 0])
+        V, F, PP = sweep(path, np.tile(up, (2, 1)), rrect(0.022, 0.022, 0.0215, 3))
+        V, F = solid(V, F)
+        p.add(V, F, kind='heat', pp=PP)
+
+
+def rcs():
+    """Right-hand RCS blocks: one on the nose, one on the tail."""
+    p = Part('rcs', 25)
+    for y in (6.05, -4.85):
+        a, zc, *_ = fuse_params(y)
+        rcs_quad(p, (fuse_side(zc, y) + 0.02, y, zc), [1.0, 0, 0])
+    return p
+
+
+
+def rocket_pod():
+    """Right-hand rocket pod on top of the wing: a faired box on a short pylon, its blunt front a 3 x 2 grid of
+    launch tubes, a hazard band and an aft cap. Visible from the chase camera, unlike the under-wing stores."""
+    p = Part('rpod', 29)
+    x, y0, y1, hw, hh = 2.72, 0.55, -1.70, 0.30, 0.19
+    le, te = wing_le(x), wing_te(x)
+    zt = NAC_Z + 0.042 * (le - te) - 0.02                      # just inside the wing's upper skin
+    zc = zt + 0.08 + hh
+    V, F, PP = rbox((x, (y0 + y1) / 2 - 0.10, zt + 0.05), (0.14, (y0 - y1) * 0.7, 0.14), 0.04)
+    p.add(V, F, kind='dark', pp=PP)
+    rings = []
+    for y, k in ((y0, 0.90), (y0 - 0.06, 1.0), (y1 + 0.35, 1.0), (y1 + 0.05, 0.82), (y1, 0.70)):
+        rr = rrect(hw * k, hh * k, 0.09 * k, 5)
+        rings.append(np.stack([x + rr[:, 0], np.full(len(rr), y), zc + rr[:, 1]], 1))
+    R = np.stack(rings)
+    m, n, _ = R.shape
+    V = R.reshape(-1, 3)
+    F = grid_faces(m, n, True)
+    V = np.concatenate([V, [R[0].mean(0), R[-1].mean(0)]])
+    F += fan(len(V) - 2, list(range(n)), V, [0, 1, 0])
+    F += fan(len(V) - 1, list(range((m - 1) * n, m * n)), V, [0, -1, 0])
+    V, F = solid(V, F)
+    p.add(V, F, pp=np.stack([V[:, 1], V[:, 0] - x + V[:, 2] - zc], 1))
+    # launch tubes: short dark bores standing proud of the front face
+    for i in range(3):
+        for j in range(2):
+            cx, cz = x + (i - 1) * 0.18, zc + (j - 0.5) * 0.17
+            prof = [(y0 + 0.035, 0.066), (y0 + 0.035, 0.050), (y0 - 0.02, 0.050), (y0 - 0.02, 0.0)]
+            V, F, PP, row = lathe(prof, 14, center=(cx, cz), rref=0.07)
+            kinds = ['dark', 'black', 'black']
+            p.add(V, F, pp=PP, kinds=[kinds[i2] for i2 in row])
+            prof = [(y0 + 0.035, 0.066), (y0 - 0.03, 0.066)]
+            V, F, PP, row = lathe(prof, 14, center=(cx, cz), rref=0.07)
+            p.add(V, F, kind='dark', pp=PP)
+    return p
+
+
+def sensor_dome():
+    """A flattened sensor dome on the spine behind the blade antenna."""
+    p = Part('dome', 30)
+    y, r = -1.10, 0.20
+    zb = spine_top(y) - 0.02
+    V, F, PP = rbox((0, y, zb + 0.015), (0.44, 0.46, 0.04), 0.015)
+    p.add(V, F, kind='dark', pp=PP)
+    prof = [(y + r, 0.0)] + [(y + r * math.cos(a), r * math.sin(a)) for a in np.linspace(0.25, np.pi - 0.25, 9)] + [(y - r, 0.0)]
+    V, F, PP, row = lathe(prof, 22, center=(0, zb), rref=r)
+    V[:, 2] = zb + (V[:, 2] - zb) * np.where(V[:, 2] > zb, 0.55, 0.0)   # flatten; the lower half folds into the base
+    p.add(V, F, pp=PP)
+    return p
+
+
 # ------------------------------------------------------------------ glow parts (separate materials)
 def disc(name, pid, cx, y, cz, r, facing):
     g = Part(name, pid)
@@ -675,6 +878,17 @@ def build():
     hull.append(keel())
     hull.append(ventral_fin())
     hull.append(nose_bits())
+    stc = stores()
+    hull += [stc, stc.mirrored('stores_l', 26)]
+    cn = canard()
+    hull += [cn, cn.mirrored('canard_l', 27)]
+    hull.append(chin_turret())
+    rp = rocket_pod()
+    hull += [rp, rp.mirrored('rpod_l', 31)]
+    hull.append(sensor_dome())
+    hull.append(antennas())
+    rc = rcs()
+    hull += [rc, rc.mirrored('rcs_l', 28)]
     glass = canopy()
     glow = {
         'GlowC': disc('GlowC', 91, 0, CEN_THROAT_Y - 0.01, CEN_Z, CEN_THROAT_R + 0.01, [0, -1, 0]),
@@ -744,5 +958,22 @@ def anchors():
             {'p': [-5.14, 0.74, 0.18], 'r': 0.2, 'part': 'wingtip'},
             {'p': [5.72, 0.3, 4.78], 'r': 0.24, 'part': 'wingtip'},
             {'p': [5.14, 0.74, 0.18], 'r': 0.2, 'part': 'wingtip'},
+            # fitted again after the stores, pods and foreplanes were added
+            {'p': [-1.94, -0.563, -0.683], 'r': 0.43, 'part': 'wing'},
+            {'p': [1.94, -0.563, -0.683], 'r': 0.43, 'part': 'wing'},
+            {'p': [3.291, -0.563, -0.806], 'r': 0.335, 'part': 'wing'},
+            {'p': [-3.291, -0.563, -0.806], 'r': 0.335, 'part': 'wing'},
+            {'p': [-1.325, 0.052, -4.129], 'r': 0.231, 'part': 'wing'},
+            {'p': [1.325, 0.052, -4.129], 'r': 0.231, 'part': 'wing'},
+            {'p': [-0.771, 0.114, -2.16], 'r': 0.624, 'part': 'hull'},
+            {'p': [0.771, 0.114, -2.16], 'r': 0.624, 'part': 'hull'},
+            {'p': [5.998, 0.36, 0.117], 'r': 0.354, 'part': 'wingtip'},
+            {'p': [-5.998, 0.36, 0.117], 'r': 0.354, 'part': 'wingtip'},
+            {'p': [5.137, 0.791, 2.394], 'r': 0.262, 'part': 'wingtip'},
+            {'p': [-5.137, 0.791, 2.394], 'r': 0.262, 'part': 'wingtip'},
+            {'p': [5.26, -0.748, 2.332], 'r': 0.231, 'part': 'wingtip'},
+            {'p': [-5.26, -0.748, 2.332], 'r': 0.231, 'part': 'wingtip'},
+            {'p': [5.568, -0.686, 0.24], 'r': 0.231, 'part': 'wingtip'},
+            {'p': [-5.568, -0.686, 0.24], 'r': 0.231, 'part': 'wingtip'},
           ],
     }
