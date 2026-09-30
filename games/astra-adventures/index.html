@@ -156,7 +156,7 @@ body.touching .inst { margin-bottom: 150px; }
     <span><kbd>↑</kbd> <kbd>↓</kbd></span><span class="lbl" id="kPitch">Pitch</span>
     <span><kbd>←</kbd> <kbd>→</kbd></span><span class="lbl">Steer</span>
     <span><kbd>A</kbd> <kbd>D</kbd></span><span class="lbl">Slide</span>
-    <span><kbd>Shift</kbd></span><span class="lbl">Boost</span>
+    <span><kbd>W</kbd><kbd>S</kbd></span><span class="lbl">Boost · brake</span>
     <span><kbd>Space</kbd></span><span class="lbl">Wing guns</span>
     <span><kbd>Drag</kbd></span><span class="lbl">Look around</span>
     <span><kbd>P</kbd> <kbd>R</kbd> <kbd>I</kbd></span><span class="lbl">Pause · reset · invert</span>
@@ -192,7 +192,8 @@ body.touching .inst { margin-bottom: 150px; }
     <div class="keygrid">
       <div><span><kbd>←</kbd><kbd>→</kbd></span>Steer</div>
       <div><span><kbd>↑</kbd><kbd>↓</kbd></span>Pitch</div>
-      <div><span><kbd>Shift</kbd></span>Boost</div>
+      <div><span><kbd>W</kbd><kbd>Shift</kbd></span>Boost forward</div>
+      <div><span><kbd>S</kbd></span>Brake</div>
       <div><span><kbd>A</kbd><kbd>D</kbd></span>Slide sideways</div>
       <div><span><kbd>Drag</kbd></span>Look around the ship</div>
       <div><span><kbd>Space</kbd></span>Fire wing guns</div>
@@ -763,7 +764,7 @@ class Ship {
     if (Math.abs(f.y) < 0.94) { const d = AY.clone().addScaledVector(f, -f.y).normalize(); const err = Math.atan2(u.clone().cross(d).dot(f), u.dot(d)); this.q.premultiply(wq.setFromAxisAngle(f, clamp(err, -1, 1) * F.levelRate * h * (1 - Math.abs(f.y)))); }
     // Translation: speed is acceleration-limited; sideways velocity (drift, or A/D) decays on its own clock.
     let fs = this.vel.dot(f), vr = this.vel.dot(rt), vu = this.vel.dot(u);
-    const target = this.boosting ? F.boost : this.speedTarget != null ? this.speedTarget : F.cruise;
+    const target = this.boosting ? F.boost : this.speedTarget != null ? this.speedTarget : I.brake ? F.cruise * 0.45 : F.cruise;   // S brakes to under half cruise
     if (fs < target) fs = Math.min(target, fs + (this.boosting ? F.boostAccel : F.accel) * h); else fs = Math.max(target, fs - (this.boostVis > 0.05 ? F.boostDecel : F.decel) * h);
     vr = I.strafe ? approach(vr, I.strafe * F.strafeSpeed, F.strafeTau, h) : approach(vr, 0, F.driftTau, h);
     vu = approach(vu, 0, F.driftTau, h);
@@ -866,7 +867,7 @@ function updateBolts(h) {
 
 /* ================================ state ================================ */
 let mode = 'title';                                 // title | fly | breach
-let paused = false, inverted = store.get('astra-invert') === '1', muted = store.get('astra-mute') === '1';
+let paused = false, inverted = store.get('astra-invert2') === '1', muted = store.get('astra-mute') === '1';
 let clock = 0, simTime = 0, timeScale = 1, hitStop = 0, breachT = 0;
 const run = { score: 0, passes: 0, streak: 0, lastPass: -99, closest: Infinity, hits: 0 };
 let best = +store.get('astra-best') || 0;
@@ -1084,7 +1085,7 @@ function readInput() {
   let strafe = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
   if (touch.used) { pitch += -touch.y; yaw += touch.x; strafe += (touch.right ? 1 : 0) - (touch.left ? 1 : 0); }
   if (inverted) pitch = -pitch;
-  return { pitch: clamp(pitch, -1, 1), yaw: clamp(yaw, -1, 1), strafe: clamp(strafe, -1, 1), boost: keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.boost, fire: keys.has('Space') || touch.fire };
+  return { pitch: clamp(pitch, -1, 1), yaw: clamp(yaw, -1, 1), strafe: clamp(strafe, -1, 1), boost: keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyW') || touch.boost, brake: keys.has('KeyS'), fire: keys.has('Space') || touch.fire };
 }
 const GAME_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
 window.addEventListener('keydown', (e) => {
@@ -1174,7 +1175,7 @@ function syncToggles() {
   $('bMute').textContent = `Sound: ${muted ? 'off' : 'on'}`; $('bMute').setAttribute('aria-pressed', String(!muted));
   $('kPitch').textContent = inverted ? 'Pitch (inverted)' : 'Pitch';
 }
-function toggleInvert() { inverted = !inverted; store.set('astra-invert', inverted ? '1' : '0'); syncToggles(); toast(inverted ? 'Inverted pitch on: ↑ drops the nose' : 'Inverted pitch off: ↑ lifts the nose'); log('invert', { on: inverted }); }
+function toggleInvert() { inverted = !inverted; store.set('astra-invert2', inverted ? '1' : '0'); syncToggles(); toast(inverted ? 'Inverted pitch on: ↑ drops the nose' : 'Inverted pitch off: ↑ lifts the nose'); log('invert', { on: inverted }); }
 function toggleMute() { muted = !muted; store.set('astra-mute', muted ? '1' : '0'); syncToggles(); audioInit(); }
 let toastUntil = -99;
 function toast(msg) { $('toast').textContent = msg; $('toast').classList.add('on'); toastUntil = clock + 2.2; }

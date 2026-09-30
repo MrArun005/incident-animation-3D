@@ -8,7 +8,7 @@ so close passes score.
   `vendor/three-r147.js` (MIT), so it needs no CDN. `./build.sh` wraps it
   into a standalone `index.html`. It fetches its models and textures from `assets/`, so serve the folder
   over HTTP (`npx serve .` or any static server); a `file://` page can't load them.
-- Controls: `←` `→` steer, `↑` `↓` pitch, `Shift` boost, `A` `D` slide sideways, drag the view to look
+- Controls: `←` `→` steer, `↑` climb, `↓` dive, `W` (or `Shift`) boost forward, `S` brake, `A` `D` slide sideways, drag the view to look
   around without turning the ship, `Space` wing guns, `P`/`Esc` pause, `R` reset, `I` inverted pitch,
   `M` sound, `C` or double-click to recentre the camera. Touch screens get a stick and buttons.
 - **Hard** (the toggle on the title screen, or `?hard`): 560 rocks in eleven tighter clusters, a weaving
