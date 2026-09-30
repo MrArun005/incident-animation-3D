@@ -13,6 +13,8 @@ args = sys.argv[1:]
 W = int(args[args.index('--res') + 1]) if '--res' in args else 4096
 H = W // 2
 OUT = os.path.join(HERE, '..', 'assets')
+# The planets are real 3D bodies in the game now (planets.py); --planet paints the old gas giant and moon in.
+PAINT_PLANET = '--planet' in args
 T0 = time.time()
 
 
@@ -131,7 +133,7 @@ def body(dirs, centre, ang_r, shade):
 
 
 AXIS = unit(np.array([0.18, 1.0, 0.12]))
-hit, n, ang = body(Df, PLANET, PLANET_R, None)
+hit, n, ang = body(Df, PLANET, PLANET_R if PAINT_PLANET else 1e-6, None)
 plat = np.arcsin(np.clip(n @ AXIS, -1, 1))
 e1 = unit(np.cross(AXIS, np.array([0, 0, 1.0])))
 e2 = np.cross(AXIS, e1)
@@ -165,14 +167,14 @@ pcol = col * (lamb * limb)[:, None] * 1.25 + atmo[:, None] * np.array([0.55, 0.6
 planet_img = img.copy()
 planet_img[hit] = pcol + 0.004
 # a soft haze just outside the lit limb
-halo = np.exp(-np.clip(ang - PLANET_R, 0, None) / math.radians(0.7)) * (~hit)
+halo = np.exp(-np.clip(ang - PLANET_R, 0, None) / math.radians(0.7)) * (~hit) * PAINT_PLANET
 hal_sun = np.clip(((Df - PLANET[None]) @ SUN) * 4 + 0.3, 0, 1)
 planet_img += (halo * hal_sun * 0.05)[:, None] * np.array([0.6, 0.66, 0.78])
 img = planet_img
 log('planet')
 
 # ---------------------------------------------------------------- the moon
-hit, n, ang = body(Df, MOON, MOON_R, None)
+hit, n, ang = body(Df, MOON, MOON_R if PAINT_PLANET else 1e-6, None)
 mu = np.clip(n @ SUN, 0, 1)
 cr = fbm(n * 9.0, 1.0, 5, 51) * 0.5 + 0.5
 mcol = np.array([0.42, 0.40, 0.38]) * (0.7 + 0.5 * cr[:, None])

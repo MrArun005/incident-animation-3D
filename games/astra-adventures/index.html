@@ -156,7 +156,8 @@ body.touching .inst { margin-bottom: 150px; }
     <span><kbd>↑</kbd> <kbd>↓</kbd></span><span class="lbl" id="kPitch">Pitch</span>
     <span><kbd>←</kbd> <kbd>→</kbd></span><span class="lbl">Steer</span>
     <span><kbd>A</kbd> <kbd>D</kbd></span><span class="lbl">Slide</span>
-    <span><kbd>W</kbd><kbd>S</kbd></span><span class="lbl">Boost · brake</span>
+    <span><kbd>W</kbd><kbd>S</kbd></span><span class="lbl">Throttle · brake</span>
+    <span><kbd>Shift</kbd></span><span class="lbl">Boost</span>
     <span><kbd>Space</kbd></span><span class="lbl">Wing guns</span>
     <span><kbd>Drag</kbd></span><span class="lbl">Look around</span>
     <span><kbd>P</kbd> <kbd>R</kbd> <kbd>I</kbd></span><span class="lbl">Pause · reset · invert</span>
@@ -192,8 +193,9 @@ body.touching .inst { margin-bottom: 150px; }
     <div class="keygrid">
       <div><span><kbd>←</kbd><kbd>→</kbd></span>Steer</div>
       <div><span><kbd>↑</kbd><kbd>↓</kbd></span>Pitch</div>
-      <div><span><kbd>W</kbd><kbd>Shift</kbd></span>Boost forward</div>
+      <div><span><kbd>W</kbd></span>Throttle up</div>
       <div><span><kbd>S</kbd></span>Brake</div>
+      <div><span><kbd>Shift</kbd></span>Boost</div>
       <div><span><kbd>A</kbd><kbd>D</kbd></span>Slide sideways</div>
       <div><span><kbd>Drag</kbd></span>Look around the ship</div>
       <div><span><kbd>Space</kbd></span>Fire wing guns</div>
@@ -420,6 +422,7 @@ async function loadModel(name) {
   dv.setUint32(20 + jl, bl, true); dv.setUint32(24 + jl, 0x004e4942, true); glb.set(bin, 28 + jl);
   return new Promise((res, rej) => gltfL.parse(glb.buffer, A, res, (e) => rej(new Error(`${name}: ${(e && e.message) || e}`))));
 }
+const PLANET_NAMES = ['mercury', 'venus', 'earth', 'moon', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'];
 let assets;
 try {
   const rockInfo = await fileL.loadAsync(A + 'rocks.json');
@@ -429,6 +432,8 @@ try {
     ...rockInfo.rocks.flatMap((r) => [loadTex(`rock-${r.name}-albedo${Q.tex}.jpg`, true), loadTex(`rock-${r.name}-normal${Q.tex}.jpg`, false)]),
   ]);
   assets = { rockInfo, shipGltf, shipInfo, rocksGltf, skyTex, starInfo, vegaMap, detailTex, rockTex };
+  assets.planetTex = Object.fromEntries(await Promise.all(PLANET_NAMES.map(async (n) => [n, await loadTex(`planet-${n}.jpg`, true, true, 4)])));
+  assets.ringTex = await loadTex('planet-rings.png', true, false, 4);
 } catch (e) {
   $('failTxt').textContent = `The ship and rock models didn't load (${(e && e.message) || e}). Reload the page to try again.`;
   $('fail').hidden = false; $('ovTitle').hidden = true; return;
@@ -453,6 +458,44 @@ const starField = (() => {
     p.renderOrder = -9; p.frustumCulled = false; g.add(p);
   }
   scene.add(g); return g;
+})();
+
+/* ================================ the planets ================================ */
+// All eight planets hang round the field, with Earth's Moon and Saturn's rings: lit spheres (so the sun gives
+// them a day side and a crescent), far enough out to sit behind every rock, and carried with the camera
+// like the stars so they keep their place in the sky. Angular sizes are for looks, not astronomy.
+const planets = (() => {
+  const g = new T.Group(), D = 7000, list = [];
+  const atmoMat = (c, k) => new T.ShaderMaterial({
+    uniforms: { uSun: { value: SUN_DIR }, uCol: { value: new T.Color(...c) }, uK: { value: k } },
+    vertexShader: 'varying vec3 vN; varying vec3 vV; void main() { vN = normalize(mat3(modelMatrix) * normal); vec4 w = modelMatrix * vec4(position, 1.0); vV = normalize(cameraPosition - w.xyz); gl_Position = projectionMatrix * viewMatrix * w; }',
+    fragmentShader: 'uniform vec3 uSun; uniform vec3 uCol; uniform float uK; varying vec3 vN; varying vec3 vV; void main() { float rim = pow(1.0 - abs(dot(vN, vV)), 3.0); float lit = smoothstep(-0.25, 0.4, dot(vN, uSun)); gl_FragColor = vec4(uCol * rim * lit * uK, 1.0); }',
+    blending: T.AdditiveBlending, side: T.BackSide, transparent: true, depthWrite: false, fog: false,
+  });
+  const add = (name, dir, deg, tilt, atmo, spin = 0.01) => {
+    const r = D * Math.sin((deg * Math.PI) / 180), m = new T.Mesh(new T.SphereGeometry(r, 64, 32),
+      new T.MeshStandardMaterial({ map: assets.planetTex[name], roughness: 1, metalness: 0, envMapIntensity: 0, fog: false }));
+    const p = V3(...dir).normalize().multiplyScalar(D);
+    const hold = new T.Group(); hold.position.copy(p); hold.rotation.z = (tilt * Math.PI) / 180; hold.add(m); g.add(hold);
+    if (atmo) { const a = new T.Mesh(new T.SphereGeometry(r * 1.035, 48, 24), atmoMat(atmo[0], atmo[1])); hold.add(a); }
+    list.push({ name, m, spin, hold, r }); return hold;
+  };
+  add('jupiter', [-0.35, 0.18, -0.92], 9.5, 3, [[0.9, 0.8, 0.65], 0.6], 0.012);
+  const sat = add('saturn', [0.58, 0.20, -0.79], 5.5, 26, [[0.95, 0.85, 0.6], 0.4], 0.011);
+  { const s = list[list.length - 1], ri = s.r * 1.24, ro = s.r * 2.33, geo = new T.RingGeometry(ri, ro, 160, 1), uv = geo.attributes.uv, pos = geo.attributes.position;
+    for (let i = 0; i < uv.count; i++) uv.setXY(i, (Math.hypot(pos.getX(i), pos.getY(i)) - ri) / (ro - ri), 0.5);
+    const ring = new T.Mesh(geo, new T.MeshStandardMaterial({ map: assets.ringTex, transparent: true, side: T.DoubleSide, roughness: 1, metalness: 0, envMapIntensity: 0, depthWrite: false, fog: false }));
+    ring.rotation.x = -Math.PI / 2 + 0.12; sat.add(ring); }
+  add('earth', [-0.82, -0.08, -0.56], 3.4, 23, [[0.35, 0.6, 1.0], 1.4], 0.02);
+  add('moon', [-0.74, -0.02, -0.66], 0.9, 6, null, 0.004);
+  add('mars', [0.22, -0.34, -0.91], 1.9, 25, [[0.9, 0.55, 0.4], 0.35], 0.018);
+  add('venus', [0.42, 0.26, 0.87], 2.6, 3, [[1.0, 0.92, 0.7], 0.9], 0.003);
+  add('mercury', [0.64, 0.60, 0.48], 1.2, 0, null, 0.004);
+  add('uranus', [-0.30, 0.56, 0.77], 2.4, 98, [[0.6, 0.9, 0.95], 0.6], 0.014);
+  add('neptune', [-0.96, 0.24, 0.18], 2.3, 28, [[0.4, 0.55, 1.0], 0.8], 0.015);
+  g.traverse((o) => { o.frustumCulled = false; o.renderOrder = -6; });
+  scene.add(g);
+  return { g, list, update(dt) { g.position.copy(camera.position); for (const p of list) p.m.rotation.y += p.spin * dt; } };
 })();
 
 /* ================================ rocks ================================ */
@@ -764,7 +807,8 @@ class Ship {
     if (Math.abs(f.y) < 0.94) { const d = AY.clone().addScaledVector(f, -f.y).normalize(); const err = Math.atan2(u.clone().cross(d).dot(f), u.dot(d)); this.q.premultiply(wq.setFromAxisAngle(f, clamp(err, -1, 1) * F.levelRate * h * (1 - Math.abs(f.y)))); }
     // Translation: speed is acceleration-limited; sideways velocity (drift, or A/D) decays on its own clock.
     let fs = this.vel.dot(f), vr = this.vel.dot(rt), vu = this.vel.dot(u);
-    const target = this.boosting ? F.boost : this.speedTarget != null ? this.speedTarget : I.brake ? F.cruise * 0.45 : F.cruise;   // S brakes to under half cruise
+    // W is a throttle (a steady 1.75x cruise, no meter); Shift is the boost burst; S brakes to under half cruise.
+    const target = this.boosting ? F.boost : this.speedTarget != null ? this.speedTarget : I.fwd ? F.cruise * 1.75 : I.brake ? F.cruise * 0.45 : F.cruise;
     if (fs < target) fs = Math.min(target, fs + (this.boosting ? F.boostAccel : F.accel) * h); else fs = Math.max(target, fs - (this.boostVis > 0.05 ? F.boostDecel : F.decel) * h);
     vr = I.strafe ? approach(vr, I.strafe * F.strafeSpeed, F.strafeTau, h) : approach(vr, 0, F.driftTau, h);
     vu = approach(vu, 0, F.driftTau, h);
@@ -1085,7 +1129,7 @@ function readInput() {
   let strafe = (keys.has('KeyD') ? 1 : 0) - (keys.has('KeyA') ? 1 : 0);
   if (touch.used) { pitch += -touch.y; yaw += touch.x; strafe += (touch.right ? 1 : 0) - (touch.left ? 1 : 0); }
   if (inverted) pitch = -pitch;
-  return { pitch: clamp(pitch, -1, 1), yaw: clamp(yaw, -1, 1), strafe: clamp(strafe, -1, 1), boost: keys.has('ShiftLeft') || keys.has('ShiftRight') || keys.has('KeyW') || touch.boost, brake: keys.has('KeyS'), fire: keys.has('Space') || touch.fire };
+  return { pitch: clamp(pitch, -1, 1), yaw: clamp(yaw, -1, 1), strafe: clamp(strafe, -1, 1), boost: keys.has('ShiftLeft') || keys.has('ShiftRight') || touch.boost, fwd: keys.has('KeyW'), brake: keys.has('KeyS'), fire: keys.has('Space') || touch.fire };
 }
 const GAME_KEYS = ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'];
 window.addEventListener('keydown', (e) => {
@@ -1343,7 +1387,7 @@ function frame(dtReal, draw = true) {
   updateRocks(paused ? 0 : dt, player.pos);
   shipVisuals(player, dt); shipVisuals(wing, dt);
   updateCamera(dt, simDt);
-  sunGlow.position.copy(camera.position).addScaledVector(SUN_DIR, 5200); sunCore.position.copy(sunGlow.position); starField.position.copy(camera.position);
+  sunGlow.position.copy(camera.position).addScaledVector(SUN_DIR, 5200); sunCore.position.copy(sunGlow.position); starField.position.copy(camera.position); planets.update(dt);
   updateFlare(dt);
   aimLights(mode === 'title' ? lf.mid.copy(player.pos).lerp(wing.pos, 0.35) : player.pos);
   updateDust(player, camera.position);

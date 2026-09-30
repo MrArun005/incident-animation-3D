@@ -8,7 +8,7 @@ so close passes score.
   `vendor/three-r147.js` (MIT), so it needs no CDN. `./build.sh` wraps it
   into a standalone `index.html`. It fetches its models and textures from `assets/`, so serve the folder
   over HTTP (`npx serve .` or any static server); a `file://` page can't load them.
-- Controls: `←` `→` steer, `↑` climb, `↓` dive, `W` (or `Shift`) boost forward, `S` brake, `A` `D` slide sideways, drag the view to look
+- Controls: `←` `→` steer, `↑` climb, `↓` dive, `W` throttle up (a steady 1.75x cruise), `S` brake, `Shift` boost, `A` `D` slide sideways, drag the view to look
   around without turning the ship, `Space` wing guns, `P`/`Esc` pause, `R` reset, `I` inverted pitch,
   `M` sound, `C` or double-click to recentre the camera. Touch screens get a stick and buttons.
 - **Hard** (the toggle on the title screen, or `?hard`): 560 rocks in eleven tighter clusters, a weaving
@@ -41,7 +41,10 @@ numpy/scipy/Pillow:
   detail. One octahedral texture per rock serves all three LODs, the normal map is object-space and exact,
   and `rocks.json` carries a radial table of each surface for collision and close-pass scoring. Normal maps
   are saved 4:4:4 (an object-space normal keeps its direction in the chroma).
-- **The sky** (`sky.py`): a 4K equirect with 90,000 stars, the Milky Way with dust lanes, a nebula and a
+- **The planets** (`planets.py`): surface maps for all eight planets, the Moon and Saturn's rings, painted from
+  noise on the sphere; the game hangs them round the field as lit spheres with atmosphere rims.
+- **The sky** (`sky.py`): a 4K equirect with 90,000 stars, the Milky Way with dust lanes, a nebula (and, with
+  `--planet`, the old painted gas giant). Not a
   banded gas giant with a moon, lit by the game's sun. It is the background and, through PMREM, what the
   ship reflects.
 
