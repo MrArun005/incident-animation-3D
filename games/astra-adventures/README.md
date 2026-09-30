@@ -4,7 +4,8 @@ A third-person flight prototype. You fly the **Jupiter Class IV** through an ast
 **Vega**, an AI wingman, on your right wing. There are no missions yet: the point is the feel of the ship,
 so close passes score.
 
-- `game.html` is the page (published as an artifact; three.js r147 from jsdelivr). `./build.sh` wraps it
+- `game.html` is the page (published as an artifact). three.js r147 and its add-ons are bundled in
+  `vendor/three-r147.js` (MIT), so it needs no CDN. `./build.sh` wraps it
   into a standalone `index.html`. It fetches its models and textures from `assets/`, so serve the folder
   over HTTP (`npx serve .` or any static server); a `file://` page can't load them.
 - Controls: `←` `→` steer, `↑` `↓` pitch, `Shift` boost, `A` `D` slide sideways, drag the view to look

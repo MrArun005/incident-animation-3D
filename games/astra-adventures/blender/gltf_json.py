@@ -1,6 +1,7 @@
-# Writes a self-contained glTF JSON copy (<name>.gltf.json) beside each binary glTF in assets/: the same
-# document with its buffer and images embedded as data URIs. The game loads these, because some static hosts
-# (claude.ai artifacts among them) won't serve .glb. GLTFLoader reads either form.
+# Writes a glTF JSON copy (<name>.gltf.json) beside each binary glTF in assets/, for hosts that won't serve
+# .glb (claude.ai artifacts among them): the geometry buffer rides inside the JSON as base64, and the images
+# are written out as plain files (<name>-tex<i>.jpg). The game decodes the buffer itself and rebuilds a GLB in
+# memory, so nothing is fetched from a data: URL.
 #   python blender/gltf_json.py            (after ship_export.py / ship_mobile.py / rocks.py)
 import base64
 import glob
@@ -16,13 +17,17 @@ def to_json(glb_path):
     doc, binc = read_glb(glb_path)
     views = doc['bufferViews']
     image_views = {img['bufferView']: i for i, img in enumerate(doc.get('images', [])) if 'bufferView' in img}
-    # Images become their own data URIs; the remaining views are repacked into one buffer.
+    # Images become their own files; the remaining views are repacked into one buffer.
     blob, remap = bytearray(), {}
     for i, v in enumerate(views):
         raw = binc[v.get('byteOffset', 0): v.get('byteOffset', 0) + v['byteLength']]
-        if i in image_views:
-            img = doc['images'][image_views[i]]
-            img['uri'] = f"data:{img.get('mimeType', 'image/png')};base64," + base64.b64encode(raw).decode('ascii')
+        if i in image_views:                                # images go out as plain files beside the JSON
+            k = image_views[i]
+            img = doc['images'][k]
+            ext = 'jpg' if img.get('mimeType', '') == 'image/jpeg' else 'png'
+            name = f"{os.path.basename(glb_path)[:-4]}-tex{k}.{ext}"
+            open(os.path.join(os.path.dirname(glb_path), name), 'wb').write(raw)
+            img['uri'] = name
             del img['bufferView']
             img.pop('mimeType', None)
             continue
