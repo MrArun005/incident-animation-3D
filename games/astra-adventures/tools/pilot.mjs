@@ -350,6 +350,8 @@ if (!LIB) {
   // deterministic, so a restarted recording replays the frames already on disk without drawing them.
   const FDIR = RECORD ? RECORD.replace(/\.mp4$/, '') + '.frames' : null;
   if (FDIR) fs.mkdirSync(FDIR, { recursive: true });
+  // --range a:b draws only frames a..b-1 (the rest are simulated, not drawn): several recorders can share one flight.
+  const RANGE = arg('range', null) ? arg('range', null).split(':').map(Number) : null;
   let nf = 0;
   const frames = [];                                   // per video frame: speed, thrust, boost (for the soundtrack)
   const held = new Set();
@@ -358,7 +360,7 @@ if (!LIB) {
     for (const k of want) if (!held.has(k)) { await page.keyboard.down(k); held.add(k); }
   }
   async function frame(i) {                            // two 1/60 s steps per 30 fps video frame; draw the second
-    const fp = FDIR && `${FDIR}/f${String(nf++).padStart(5, '0')}.jpg`, need = fp && !fs.existsSync(fp);
+    const idx = nf++, fp = FDIR && `${FDIR}/f${String(idx).padStart(5, '0')}.jpg`, need = fp && !fs.existsSync(fp) && (!RANGE || (idx >= RANGE[0] && idx < RANGE[1]));
     const s = await page.evaluate((draw) => { window.__astra.step(1 / 60, false); window.__astra.step(1 / 60, draw); return window.__astra.state(); }, !!need);   // a dry run doesn't draw
     if (need) { const buf = await page.screenshot({ type: 'jpeg', quality: 92 }); fs.writeFileSync(fp + '.tmp', buf); fs.renameSync(fp + '.tmp', fp); }
     frames.push({ t: s.t, speed: s.speed, boosting: s.boosting }); return s;
@@ -428,6 +430,7 @@ if (!LIB) {
   await page.keyboard.press('KeyP'); for (let i = 0; i < 10; i++) await frame(0);
 
   const s = await state(), ev = await page.evaluate(() => window.__astra.events(0));
+  if (FDIR && RANGE) { console.log(`range ${RANGE[0]}:${RANGE[1]} done`); await g.browser.close(); process.exit(0); }
   if (FDIR) await new Promise((r, j) => spawn(FFMPEG, ['-y', '-loglevel', 'error', '-framerate', '30', '-i', `${FDIR}/f%05d.jpg`, '-frames:v', String(nf), '-c:v', 'libx264', '-preset', 'slow', '-crf', '16', '-pix_fmt', 'yuv420p', RECORD], { stdio: 'inherit' }).on('close', (c) => (c ? j(new Error('ffmpeg ' + c)) : r())));
   const out = LOG || (RECORD ? RECORD.replace(/\.mp4$/, '.json') : '/tmp/claude-0/pilot-run.json');
   fs.writeFileSync(out, JSON.stringify({ frames, events: ev, final: s }));
