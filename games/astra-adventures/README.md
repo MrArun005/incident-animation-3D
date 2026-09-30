@@ -43,9 +43,8 @@ numpy/scipy/Pillow:
   are saved 4:4:4 (an object-space normal keeps its direction in the chroma).
 - **The planets** (`planets.py`): surface maps for all eight planets, the Moon and Saturn's rings, painted from
   noise on the sphere; the game hangs them round the field as lit spheres with atmosphere rims.
-- **The sky** (`sky.py`): a 4K equirect with 90,000 stars, the Milky Way with dust lanes, a nebula (and, with
-  `--planet`, the old painted gas giant). Not a
-  banded gas giant with a moon, lit by the game's sun. It is the background and, through PMREM, what the
+- **The sky** (`sky.py`): a 4K equirect with 90,000 stars, the Milky Way with dust lanes, and a nebula
+  (`--planet` paints the old gas giant back in). It is the background and, through PMREM, what the
   ship reflects.
 
 ## Rendering
