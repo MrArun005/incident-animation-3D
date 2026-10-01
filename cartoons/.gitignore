@@ -6,3 +6,5 @@ out/*.mp4
 out/*.log
 out/*.mbtree
 assets/gameplay/
+out/*.frames/
+out/*.done

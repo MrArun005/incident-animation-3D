@@ -1,0 +1,14 @@
+{
+  "duration": 154.0,
+  "scenes": [["bottom", 0], ["trying", 14], ["again", 30], ["lowest", 52], ["light", 62], ["together", 78], ["climb", 92], ["break", 114], ["last", 128], ["end", 140]],
+  "title": 2.5, "lookUp": 6.0, "tiltUp": 7.5, "tiltDown": 11.0,
+  "c1": 14.5, "smile1": 22.5, "bug1": 24.6, "hit1": 26.0, "land1": 28.2,
+  "c2": 30.5, "hit2": 37.6, "land2": 39.6, "c3": 40.8, "crumble": 48.4, "land3": 51.2,
+  "dimOut": 53.0, "staticPeak": 57.0,
+  "blip": 64.0, "headUp": 65.6, "reveal": 68.0,
+  "rise": 79.0, "offer": 82.4, "take": 84.2, "spread": 85.5,
+  "stack": 92.6, "slip": 100.2, "catch": 101.0, "gap": 105.0, "bridge": 106.0, "top": 112.8,
+  "push": 114.4, "crack": 116.2, "open": 119.0, "pour": 120.0,
+  "alone": 128.4, "chain": 131.0, "grab": 134.0, "pulled": 135.0, "solid": 137.0,
+  "wide": 140.5, "lookBack": 143.0, "endTitle": 146.5, "fadeOut": 152.0
+}
