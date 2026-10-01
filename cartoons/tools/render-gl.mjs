@@ -54,6 +54,7 @@ if (opt('stills')) {
   for (const s of opt('stills').split(',').map(Number)) { save(path.join(OUT, `still-${STORY}-${s}.jpg`), await grab(Math.round(s * FPS))); console.log(`still ${s}`); }
 } else {
   const N = Math.round(DURATION * FPS), [a, b] = (opt('range', `0:${N}`)).split(':').map(Number);
+  fs.writeFileSync(path.join(FR, '.total'), String(N));       // the render-progress mod reads this for its bar
   const t0 = Date.now(); let done = 0;
   for (let i = a; i < Math.min(b, N); i++) {
     const f = path.join(FR, `f${String(i).padStart(5, '0')}.jpg`);
