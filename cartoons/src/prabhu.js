@@ -5,7 +5,7 @@
 // phone LCD pixels... Wordless; the score is tools/audio-prabhu.mjs, on the beat grid in
 // stories/prabhu.beats.json (120 bpm, 3 s a panel). 1920x1080, 30 fps.
 import B from '../stories/prabhu.beats.json' with { type: 'json' };
-import { L, P, joints, drawPrabhu, OUTFITS, mono } from './prabhu-char.js';
+import { L, P, joints, drawPrabhu, OUTFITS, mono, footDrop } from './prabhu-char.js';
 import { MOVES, blendPose } from './prabhu-moves.js';
 
 const W = 1920, H = 1080, FPS = 30, DURATION = B.duration, BEAT = 60 / B.bpm;
@@ -461,10 +461,40 @@ function camera(t) {
   const z = seg(t, TEND + 0.6, TEND + 4.4);
   return { x: lerp(x, panelX((N - 1) / 2), z), s: lerp(1, (W * 0.94) / (N * PITCH), z ** 0.7) };
 }
+// The shots in the song (B.hits, video seconds): on each one he fires a finger gun, the arm snapping out and
+// kicking up with the recoil, alternating hands; a BANG! flash at the fingertip and a jolt of the camera.
+const HITS = B.hits || [];
+function shotAt(t) {
+  let best = null; HITS.forEach((h, i) => { const d = t - h; if (d > -0.12 && d < 0.45 && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, i, h }; });
+  return best;
+}
+function shoot(pose, t) {
+  const s = shotAt(t); if (!s) return { pose, shot: null };
+  const w = s.d < 0 ? ease(1 + s.d / 0.12) : 1 - ease(clamp((s.d - 0.18) / 0.27, 0, 1));   // in fast, hold, let go
+  const kick = s.d < 0 ? 0 : Math.exp(-s.d * 14) * 0.45, right = s.i % 2 === 0;
+  const aim = right ? { ra: [1.55 - kick, -0.05 - kick * 0.6] } : { la: [-1.55 + kick, 0.05 + kick * 0.6] };
+  const target = { ...pose, ...aim, lean: pose.lean + (right ? -1 : 1) * 0.05 * kick, head: right ? 0.18 : -0.18, face: 1 };
+  return { pose: blendPose(pose, target, w), shot: { right, k: s.d < 0 ? 0 : Math.max(0, 1 - s.d / 0.22), d: s.d } };
+}
 function dancer(t) {
-  if (t < T0) return { wx: panelX(0), pose: MOVES.groove(0) };
-  const gb = (t - T0) / BEAT, x = camU((t - T0) / TP) * PITCH;
-  return { wx: x + Math.sin(gb * Math.PI / 6) * 14, pose: poseAt(gb) };
+  if (t < T0) { const sh = shoot(MOVES.groove(0), t); return { wx: panelX(0), pose: sh.pose, shot: sh.shot }; }
+  const gb = (t - T0) / BEAT, x = camU((t - T0) / TP) * PITCH, sh = shoot(poseAt(gb), t);
+  return { wx: x + Math.sin(gb * Math.PI / 6) * 14, pose: sh.pose, shot: sh.shot };
+}
+// the BANG! at the fingertip, in panel-local px
+function bang(gc, P_, pose, fx, shot) {
+  if (!shot || shot.k <= 0) return;
+  const fh = (P_.fh || 0.52) * PS, floor = (P_.floor || 0.86) * PS, J = joints(pose), py = floor - footDrop(J) * fh - pose.y * fh;
+  const arm = shot.right ? J.ra : J.la, hx = fx + arm[2][0] * fh * pose.sx, hy = py + arm[2][1] * fh;
+  const dx = (arm[2][0] - arm[1][0]) * pose.sx, dy = arm[2][1] - arm[1][1], dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
+  const cx = hx + ux * 40, cy = hy + uy * 40, R0 = 26 + 44 * (1 - shot.k), k = shot.k;
+  gc.save(); gc.globalAlpha = Math.min(1, k * 1.6);
+  gc.fillStyle = '#ffe14d'; gc.strokeStyle = '#1a1206'; gc.lineWidth = 4; gc.beginPath();
+  for (let i = 0; i < 20; i++) { const a = i / 20 * TAU + 0.2, r = i % 2 ? R0 * 0.55 : R0; gc.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); }
+  gc.closePath(); gc.fill(); gc.stroke();
+  gc.fillStyle = '#ff4a2b'; gc.beginPath(); gc.arc(cx, cy, R0 * 0.35, 0, TAU); gc.fill();
+  if (shot.d > 0.02) { gc.font = `bold ${Math.round(30 + 10 * (1 - k))}px ${SANS}`; gc.textAlign = 'center'; gc.textBaseline = 'middle'; gc.lineWidth = 6; gc.strokeText('BANG!', cx + ux * 70, cy + uy * 20 - 40); gc.fillStyle = '#fff'; gc.fillText('BANG!', cx + ux * 70, cy + uy * 20 - 40); }
+  gc.restore();
 }
 
 // ---- drawing --------------------------------------------------------------------------------------------------------
@@ -482,7 +512,7 @@ function drawGallery(t, cam, dn, opts = {}) {
     if (P_.fg) P_.fg(g, t, t - (T0 + P_.k * TP));
     if (showThumb > 0) { g.globalAlpha = showThumb; g.drawImage(P_.thumb, 0, 0); g.globalAlpha = 1; }
     // the dancer, in this panel's style, wherever he overlaps it
-    if (dn && Math.abs(dn.wx - cx) < PS * 0.95) drawFigureIn(g, P_, dn.pose, dn.wx - x0 + (P_.fx ? P_.fx - PS / 2 : 0));
+    if (dn && Math.abs(dn.wx - cx) < PS * 0.95) { const fxl = dn.wx - x0 + (P_.fx ? P_.fx - PS / 2 : 0); drawFigureIn(g, P_, dn.pose, fxl); bang(g, P_, dn.pose, fxl, dn.shot); }
     g.restore();
     // label
     if (cam.s > 0.45) {
@@ -503,7 +533,9 @@ function title(a, y, big = 96, sub = 'the dance through time', sub2 = 'Bhimbetka
   g.globalAlpha = 1;
 }
 function frame(t) {
-  g.drawImage(wall, 0, 0);
+  g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(wall, 0, 0);
+  const sh0 = t < T0 ? shotAt(t) : null;
+  if (sh0 && sh0.d > 0) { const j = Math.exp(-sh0.d * 18) * 10; g.translate(Math.sin(t * 97) * j, Math.cos(t * 83) * j * 0.6); }
   if (t < T0) {
     // the opening: title, then the twenty panels laid out small, then a zoom into the first
     const zoom = seg(t, 3.3, T0), ts = 0.19, GY = 580;
@@ -521,12 +553,13 @@ function frame(t) {
       LIST.forEach((P_, i) => { if (i === 0) return; const x = (W - gw) / 2 + (i % cols) * (sz + gap), y = GY + Math.floor(i / cols) * (sz + gap); g.globalAlpha = 1 - zoom; g.drawImage(P_.thumb, x, y, sz, sz); });
       g.globalAlpha = 1;
       g.save(); g.translate(cx, cy); g.scale(gridS, gridS); g.drawImage(zoom > 0.6 ? LIST[0].cache : LIST[0].thumb, -PS / 2, -PS / 2); g.restore();
-      if (zoom > 0.6) { g.save(); g.translate(cx, cy); g.scale(gridS, gridS); g.translate(-PS / 2, -PS / 2); drawFigureIn(g, LIST[0], MOVES.groove((t - 3) / BEAT), PS / 2); g.restore(); }
+      if (zoom > 0.6) { const dn0 = dancer(t); g.save(); g.translate(cx, cy); g.scale(gridS, gridS); g.translate(-PS / 2, -PS / 2); drawFigureIn(g, LIST[0], dn0.pose, PS / 2); bang(g, LIST[0], dn0.pose, PS / 2, dn0.shot); g.restore(); }
     }
     g.globalAlpha = 1 - seg(t, 0, 0.5); g.fillStyle = '#000'; g.fillRect(0, 0, W, H); g.globalAlpha = 1;
     return;
   }
   const cam = camera(t), dn = dancer(t);
+  if (dn.shot && dn.shot.d > 0) { const j = Math.exp(-dn.shot.d * 18) * 9; cam.x += Math.sin(t * 97) * j; g.translate(0, Math.cos(t * 83) * j * 0.6); }
   const outro = seg(t, TEND + 0.8, TEND + 3.0);
   drawGallery(t, cam, dn, { thumbs: (k) => (k === N - 1 ? 0 : outro) });
   if (t > TEND + 3.6) {
