@@ -1,0 +1,9 @@
+{
+  "bpm": 120,
+  "intro": 5,
+  "panel": 3,
+  "outro": 7,
+  "duration": 72,
+  "panels": ["rock", "seal", "nataraja", "relief", "mughal", "tanjore", "warli", "madhubani", "puppet", "kalighat",
+             "silent", "poster", "tv", "cassette", "truck", "neon", "popart", "lcd", "lowpoly", "reel"]
+}

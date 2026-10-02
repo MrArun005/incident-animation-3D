@@ -1,0 +1,111 @@
+<title>Prabhu Deva Through Time</title>
+<style>
+/* Layout: one dark screening room; the 16:9 stage fills the width, a slim transport bar sits under it. */
+:root {
+  --room: #13100d;        /* warm black, the cinema */
+  --panel: #1f1a15;
+  --ink: #efe6d6;         /* the gallery wall's cream, as text */
+  --muted: #a39782;
+  --ochre: #d9a440;       /* Bhimbetka ochre / Tanjore gold */
+  --tick: #5a4f40;
+  --display: "Cormorant Garamond", "Liberation Serif", Georgia, serif;
+  --ui: "Work Sans", "Liberation Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", "DejaVu Sans Mono", ui-monospace, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; }
+body { background: var(--room); color: var(--ink); font-family: var(--ui); margin: 0; }
+.wrap { box-sizing: border-box; max-width: 1180px; margin: 0 auto; padding-inline: 16px; padding-block: 14px 24px; display: grid; gap: 12px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+h1 { margin: 0; font-family: var(--display); font-weight: 500; font-size: clamp(1.4rem, 4vw, 2.1rem); letter-spacing: 0.18em; text-transform: uppercase; text-wrap: balance; }
+.sub { font-family: var(--display); font-style: italic; color: var(--muted); font-size: clamp(0.95rem, 2.4vw, 1.15rem); }
+.stage { position: relative; width: 100%; aspect-ratio: 16 / 9; max-width: 100%; background: #000; border-radius: 6px; overflow: hidden; }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.big[hidden] { display: none; }
+.big { position: absolute; inset: 0; margin: auto; width: 68px; height: 68px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--room) 72%, transparent); color: var(--ochre); cursor: pointer; display: grid; place-items: center; box-shadow: 0 0 0 2px var(--ochre); }
+.big svg { width: 28px; height: 28px; margin-left: 4px; }
+.big:focus-visible, button:focus-visible, input:focus-visible { outline: 2px solid var(--ochre); outline-offset: 3px; }
+.bar { display: grid; grid-template-columns: auto 1fr auto auto; align-items: center; gap: 12px; background: var(--panel); border-radius: 6px; padding: 10px 12px; }
+.btn { border: 0; background: transparent; color: var(--ink); width: 36px; height: 36px; display: grid; place-items: center; cursor: pointer; border-radius: 4px; }
+.btn svg { width: 22px; height: 22px; }
+.track { position: relative; min-width: 0; height: 36px; display: grid; align-items: center; }
+.ticks { position: absolute; left: 0; right: 0; top: 50%; height: 12px; transform: translateY(-50%); pointer-events: none; }
+.ticks i { position: absolute; top: 0; width: 1px; height: 12px; background: var(--tick); }
+input[type=range] { -webkit-appearance: none; appearance: none; width: 100%; background: transparent; margin: 0; position: relative; }
+input[type=range]::-webkit-slider-runnable-track { height: 4px; background: linear-gradient(to right, var(--ochre) var(--p, 0%), var(--tick) var(--p, 0%)); border-radius: 2px; }
+input[type=range]::-moz-range-track { height: 4px; background: var(--tick); border-radius: 2px; }
+input[type=range]::-moz-range-progress { height: 4px; background: var(--ochre); }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--ink); margin-top: -6px; }
+input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border: 0; border-radius: 50%; background: var(--ink); }
+.time { font-family: var(--mono); font-size: 0.8rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.now { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; font-size: 0.9rem; min-height: 1.4em; }
+.now b { font-family: var(--mono); color: var(--ochre); font-weight: 500; letter-spacing: 0.04em; }
+.now span { letter-spacing: 0.12em; text-transform: uppercase; font-weight: 600; font-size: 0.8rem; }
+.now em { color: var(--muted); font-family: var(--display); font-size: 1rem; }
+.hint { color: var(--muted); font-size: 0.8rem; }
+.stage:fullscreen { border-radius: 0; aspect-ratio: auto; }
+@media (orientation: landscape) and (max-height: 520px) {
+  header, .now, .hint { display: none; }
+  .wrap { padding-block: 6px; gap: 6px; max-width: calc((100vh - 70px) * 16 / 9); }
+}
+@media (prefers-reduced-motion: reduce) { .big { transition: none; } }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,500&family=IBM+Plex+Mono:wght@500&family=Work+Sans:wght@400;600&display=swap">
+<div class="wrap">
+  <header>
+    <h1>Prabhu Deva</h1>
+    <div class="sub">the dance through time · 20 panels · one dancer</div>
+  </header>
+  <div class="stage" id="stage">
+    <canvas id="c" width="1920" height="1080" aria-label="Animation: a dancer moving through twenty panels of Indian art styles"></canvas>
+    <button class="big" id="big" aria-label="Play with sound"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12-7.5z"/></svg></button>
+  </div>
+  <div class="bar">
+    <button class="btn" id="play" aria-label="Play"><svg viewBox="0 0 24 24" fill="currentColor"><path id="playIcon" d="M7 4.5v15l12-7.5z"/></svg></button>
+    <div class="track"><div class="ticks" id="ticks"></div><input id="seek" type="range" min="0" max="72" step="0.01" value="2.8" aria-label="Position"></div>
+    <span class="time" id="time">0:02 / 1:12</span>
+    <button class="btn" id="full" aria-label="Full screen"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+  </div>
+  <div class="now" id="now"></div>
+  <div class="hint">Turn your phone sideways for the big picture. Tap the stage to pause.</div>
+</div>
+<audio id="aud" preload="auto" src="data:audio/mp4;base64,__AUDIO__"></audio>
+<script type="module">
+__SCENE__
+
+const aud = document.getElementById('aud'), seek = document.getElementById('seek'), timeEl = document.getElementById('time'), nowEl = document.getElementById('now');
+const big = document.getElementById('big'), playBtn = document.getElementById('play'), icon = document.getElementById('playIcon'), stage = document.getElementById('stage');
+const PLAY = 'M7 4.5v15l12-7.5z', PAUSE = 'M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z';
+const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
+const ticks = document.getElementById('ticks');
+B.panels.forEach((_, k) => { const i = document.createElement('i'); i.style.left = `${((B.intro + k * B.panel) / DURATION) * 100}%`; ticks.appendChild(i); });
+let playing = false, clockT = 2.8, clock0 = 0, lastPanel = -2;
+function show(t) {
+  frame(t);
+  seek.value = t; seek.style.setProperty('--p', `${(t / DURATION) * 100}%`);
+  timeEl.textContent = `${fmt(t)} / ${fmt(DURATION)}`;
+  const k = t < B.intro ? -1 : Math.min(B.panels.length - 1, Math.floor((t - B.intro) / B.panel));
+  if (k !== lastPanel) { lastPanel = k; const P_ = k >= 0 ? LIST[k] : null; nowEl.innerHTML = P_ ? `<b>${String(k + 1).padStart(2, '0')}/20</b><span>${P_.name}</span><em>${P_.where}</em>` : '<b>00/20</b><span>Title</span><em>8000 BC to 2024</em>'; }
+}
+const now = () => (aud.readyState >= 2 && !aud.paused ? aud.currentTime : clockT + (performance.now() - clock0) / 1000);
+function tick() { if (!playing) return; let t = now(); if (t >= DURATION) { t = DURATION; stop(); } show(t); if (playing) requestAnimationFrame(tick); }
+function start() {
+  if (clockT >= DURATION - 0.05) clockT = 0;
+  playing = true; big.hidden = true; icon.setAttribute('d', PAUSE); playBtn.setAttribute('aria-label', 'Pause');
+  clock0 = performance.now(); try { aud.currentTime = clockT; } catch (e) {}
+  aud.play().catch(() => {});                    // if the phone refuses sound, the clock carries on silently
+  try { navigator.wakeLock?.request('screen').catch(() => {}); } catch (e) {}
+  requestAnimationFrame(tick);
+}
+function stop() { clockT = now(); playing = false; aud.pause(); icon.setAttribute('d', PLAY); playBtn.setAttribute('aria-label', 'Play'); if (clockT >= DURATION - 0.05) big.hidden = false; }
+big.addEventListener('click', start);
+playBtn.addEventListener('click', () => (playing ? stop() : start()));
+stage.addEventListener('click', (e) => { if (e.target === big || big.contains(e.target)) return; playing ? stop() : start(); });
+seek.addEventListener('input', () => { clockT = Number(seek.value); clock0 = performance.now(); try { aud.currentTime = clockT; } catch (e) {} if (!playing) show(clockT); });
+document.getElementById('full').addEventListener('click', async () => {
+  try { if (document.fullscreenElement) await document.exitFullscreen(); else { await stage.requestFullscreen(); await screen.orientation?.lock?.('landscape').catch(() => {}); } } catch (e) {}
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && playing) stop(); });
+show(clockT);
+</script>
