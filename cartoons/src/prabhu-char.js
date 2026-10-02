@@ -52,7 +52,7 @@ function capsule(g, a, b, ra, rb) {
   g.arc(b[0], b[1], rb, th + Math.PI / 2, th - Math.PI / 2, true);
   g.lineTo(a[0] - nx * ra, a[1] - ny * ra); g.arc(a[0], a[1], ra, th - Math.PI / 2, th - 3 * Math.PI / 2, true); g.closePath();
 }
-const fillPath = (g, col, stroke, w) => { g.fillStyle = col; g.fill(); if (stroke) { g.strokeStyle = stroke; g.lineWidth = w; g.stroke(); } };
+const fillPath = (g, col, stroke, w) => { g.fillStyle = col; g.fill(); if (stroke && w > 0) { g.strokeStyle = stroke; g.lineWidth = w; g.stroke(); } };
 
 // Draws him with the feet on (fx, floor), fh pixels tall. o: an outfit (or mono). opts: { face, hat, line }
 export function drawPrabhu(g, p, o, fx, floor, fh, opts = {}) {

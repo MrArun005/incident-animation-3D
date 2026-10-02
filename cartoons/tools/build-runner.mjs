@@ -15,11 +15,14 @@ const done = new Set();
 function inline(file) {
   let src = fs.readFileSync(file, 'utf8');
   src = src.replace(/^import B from .*$/m, `const B = ${beats.trim()};`);
+  src = src.replace(/^import (\w+) from '(\.\.\/stories\/[^']+\.json)' with \{ type: 'json' \};$/gm, (_, n, rel) => `const ${n} = ${fs.readFileSync(path.join(path.dirname(file), rel), 'utf8').trim()};`);
   let pre = '';
   src = src.replace(/^import \{([^}]+)\} from '(\.\/[^']+)';$/gm, (_, names, rel) => {
     const dep = path.join(path.dirname(file), rel);
     if (!done.has(dep)) { done.add(dep); pre += moduleScope(dep); }
-    return '';
+    // renamed imports (X as Y) become local aliases of the module's export
+    const id = '__' + path.basename(dep, '.js').replace(/\W/g, '_');
+    return names.split(',').map((n) => n.trim().split(/\s+as\s+/)).filter((x) => x.length === 2).map(([x, y]) => `const ${y} = ${id}.${x};`).join('\n');
   });
   return pre + src;
 }

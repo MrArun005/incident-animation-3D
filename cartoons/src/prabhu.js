@@ -7,6 +7,8 @@
 import B from '../stories/prabhu.beats.json' with { type: 'json' };
 import { L, P, joints, drawPrabhu, OUTFITS, mono, footDrop } from './prabhu-char.js';
 import { MOVES, blendPose } from './prabhu-moves.js';
+import { drawRig, toSpark, blendSpark, sampleClip, rigPoints } from './prabhu-rig.js';
+import MC from '../stories/prabhu-mocap.json' with { type: 'json' };
 
 const W = 1920, H = 1080, FPS = 30, DURATION = B.duration, BEAT = 60 / B.bpm;
 const c = document.getElementById('c'); c.width = W; c.height = H;
@@ -36,8 +38,8 @@ function toOutfit(pal, hat) {
   return { ...OUTFITS.film94, skin: pal.skin, skinShade: darken(hex(pal.skin)), hair: pal.hair, shirt: pal.shirt, shirtShade: darken(hex(pal.shirt), 0.85), shirt2: null,
     pants: pal.pants, pantsShade: darken(hex(pal.pants), 1.25 > 1 ? 0.7 : 0.7), shoes: pal.shoes, sole: darken(hex(pal.shoes), 0.8), hatCol: pal.hat, band: pal.band, hat, sleeve: pal.sleeve || 'long', open: false, tee: null, line: pal.line || '#140c08' };
 }
-function flatFigure(gc, p, pal, fx, floor, fh, hat = 'none', face = true) {
-  return drawPrabhu(gc, p, toOutfit(pal, hat), fx, floor, fh, { face: face ? undefined : -1, lineW: 0.005 });
+function flatFigure(gc, sp, pal, fx, floor, fh, hat = 'none', face = true) {
+  return drawRig(gc, sp, toOutfit(pal, hat), fx, floor, fh, { face: face ? undefined : -1 });
 }
 // The skeleton as strokes (rock art, neon): returns nothing; fills/strokes on gc.
 function stickFigure(gc, p, fx, floor, fh, col, w, opts = {}) {
@@ -88,7 +90,7 @@ const PANELS = {
       gc.beginPath(); gc.ellipse(560, 560, 60, 26, 0, 0, TAU); gc.fill(); for (const lx of [520, 540, 580, 600]) { gc.beginPath(); gc.moveTo(lx, 575); gc.lineTo(lx, 615); gc.stroke(); } gc.beginPath(); gc.moveTo(612, 548); gc.lineTo(640, 520); gc.lineTo(650, 500); gc.moveTo(632, 528); gc.lineTo(660, 520); gc.stroke();
       for (const [x, y] of [[90, 600], [140, 630]]) { gc.globalAlpha = 0.5; gc.beginPath(); gc.ellipse(x, y, 16, 20, 0, 0, TAU); gc.fill(); for (let f = 0; f < 5; f++) { gc.beginPath(); gc.ellipse(x - 16 + f * 8, y - 28, 4, 12, (f - 2) * 0.2, 0, TAU); gc.fill(); } gc.globalAlpha = 1; }
     },
-    fig(gc, p, fx, floor, fh) { stickFigure(gc, p, fx, floor, fh, 'rgba(158,44,22,0.92)', 13, { headFill: true }); } },
+    fig(gc, p, fx, floor, fh) { rockPaint(gc, p, fx, floor, fh, '#9e2c16'); } },
 
   seal: { name: 'INDUS SEAL', where: 'Mohenjo-daro · 2500 BC', move: 'point',
     bg(gc, r) {
@@ -173,7 +175,7 @@ const PANELS = {
       const n = 16; for (let i = 0; i < n; i++) { const a = i / n * TAU + t * 0.6, x = 360 + Math.cos(a) * 250, y = 200 + Math.sin(a) * 50, s = 0.55 + 0.25 * (Math.sin(a) + 1) / 2;
         warliFigure(gc, MOVES.groove(t * 2 + i * 0.5), x, y + 40 * s, 120 * s, `rgba(242,235,220,${0.55 + 0.4 * (Math.sin(a) + 1) / 2})`); }
     },
-    fig(gc, p, fx, floor, fh) { warliFigure(gc, p, fx, floor, fh, '#f6efe2'); }, floor: 0.88, fh: 0.5 },
+    fig(gc, p, fx, floor, fh) { rockPaint(gc, p, fx, floor, fh, '#f6efe2', 0.12); }, floor: 0.88, fh: 0.5 },
 
   madhubani: { name: 'MADHUBANI', where: 'Mithila, Bihar · folk', move: 'groove',
     pal: { skin: '#e3a34a', hair: '#141414', shirt: '#d8302f', pants: '#1d5fa8', shoes: '#141414', hat: '#141414', sleeve: 'short', line: '#141414' },
@@ -292,7 +294,7 @@ const PANELS = {
       gc.font = `bold 64px ${SANS}`; gc.shadowColor = '#3fe6ff'; gc.fillStyle = '#b8f6ff'; gc.fillText('DANCE', 520, 130); gc.restore();
       gc.strokeStyle = 'rgba(63,230,255,0.6)'; gc.shadowColor = '#3fe6ff'; gc.shadowBlur = 16; gc.lineWidth = 5; gc.strokeRect(40, 40, PS - 80, PS - 80); gc.shadowBlur = 0;
     },
-    fig(gc, p, fx, floor, fh) { stickFigure(gc, p, fx, floor, fh, '#ffd23f', 10, { glow: true, hat: true, core: '#fff7d6' }); }, floor: 0.86, fh: 0.52 },
+    fig(gc, p, fx, floor, fh) { neonBody(gc, p, fx, floor, fh, '#ffd23f', '#fff7d6'); }, floor: 0.86, fh: 0.52 },
 
   popart: { name: 'POP ART', where: 'silkscreen · 2008', move: 'spin', hat: 'fedora',
     pal: { skin: '#ffd23a', hair: '#111', shirt: '#ff3d7f', pants: '#1a3cff', shoes: '#111', hat: '#111', band: '#ff3d7f', sleeve: 'long', line: '#111' },
@@ -376,18 +378,32 @@ function highlight(gc, p, fx, floor, fh) {
   f2.globalCompositeOperation = 'destination-out'; f2.drawImage(F2, -6, 3); f2.globalCompositeOperation = 'source-over';
   gc.save(); gc.globalAlpha = 0.65; gc.drawImage(F2, 0, 0); gc.restore();
 }
-function necklace(gc, p, fx, floor, fh) {
-  const J = joints(p), lowest = Math.max(J.ll[2][1], J.rl[2][1]) + L.foot, py = floor - lowest * fh - p.y * fh;
-  gc.save(); gc.translate(fx, py); gc.scale(fh * p.sx, fh); gc.strokeStyle = '#f6dc7a'; gc.lineWidth = 0.012; gc.beginPath(); gc.arc(J.neck[0], J.neck[1] + 0.02, 0.05, 0.3, Math.PI - 0.3); gc.stroke(); gc.fillStyle = '#d42a3a'; gc.beginPath(); gc.arc(J.neck[0], J.neck[1] + 0.07, 0.012, 0, TAU); gc.fill();
-  gc.fillStyle = '#f6dc7a'; gc.beginPath(); gc.ellipse(J.head[0], J.head[1] - L.head * 0.75, 0.07, 0.03, 0, Math.PI, TAU); gc.fill(); gc.restore();
+function necklace(gc, sp, fx, floor, fh) {
+  const Q = rigPoints(sp, fx, floor, fh), s0 = fh / 7.65;
+  gc.save(); gc.strokeStyle = '#f6dc7a'; gc.lineWidth = s0 * 0.09; gc.beginPath(); gc.arc(Q.neck[0], Q.neck[1] + s0 * 0.25, s0 * 0.33, 0.3, Math.PI - 0.3); gc.stroke();
+  gc.fillStyle = '#d42a3a'; gc.beginPath(); gc.arc(Q.neck[0], Q.neck[1] + s0 * 0.6, s0 * 0.09, 0, TAU); gc.fill(); gc.restore();
 }
 function puppet(gc, p, fx, floor, fh, pal) {
   f1.clearRect(0, 0, PS, PS); flatFigure(f1, p, pal, fx, floor, fh, 'none', false);
   f1.globalCompositeOperation = 'destination-out'; for (let y = 0; y < PS; y += 16) for (let x = (y / 16) % 2 ? 8 : 0; x < PS; x += 16) { f1.beginPath(); f1.arc(x, y, 2.4, 0, TAU); f1.fill(); } f1.globalCompositeOperation = 'source-over';
-  const J = joints(p), lowest = Math.max(J.ll[2][1], J.rl[2][1]) + L.foot, py = floor - lowest * fh - p.y * fh;
-  gc.save(); gc.strokeStyle = 'rgba(60,30,10,0.8)'; gc.lineWidth = 4; for (const a of [J.la, J.ra]) { gc.beginPath(); gc.moveTo(fx + a[2][0] * fh * p.sx, py + a[2][1] * fh); gc.lineTo(fx + a[2][0] * fh * p.sx * 1.4, PS - 50); gc.stroke(); } gc.restore();
+  const Q = rigPoints(p, fx, floor, fh);
   gc.save(); gc.globalAlpha = 0.88; gc.shadowColor = 'rgba(255,200,90,0.8)'; gc.shadowBlur = 16; gc.drawImage(F1, 0, 0); gc.restore();
-  gc.fillStyle = '#2a120a'; for (const pt of [J.la[1], J.ra[1], J.ll[1], J.rl[1]]) { gc.beginPath(); gc.arc(fx + pt[0] * fh * p.sx, py + pt[1] * fh, 5, 0, TAU); gc.fill(); }
+  gc.fillStyle = '#2a120a'; for (const pt of [Q.eL, Q.eR, Q.kL, Q.kR]) { gc.beginPath(); gc.arc(pt[0], pt[1], 5, 0, TAU); gc.fill(); }
+}
+// His whole body as paint on rock or mud: a flat silhouette in one pigment, worn away in specks
+function rockPaint(gc, p, fx, floor, fh, col, wear = 0.2) {
+  f1.clearRect(0, 0, PS, PS); flatFigure(f1, p, PAL.mono(col), fx, floor, fh, 'none', false);
+  f1.globalCompositeOperation = 'destination-out'; const r = rng(7);
+  for (let i = 0; i < 900; i++) { f1.globalAlpha = r() * wear * 2.5; f1.beginPath(); f1.arc(r() * PS, r() * PS, 1 + r() * 3.5, 0, TAU); f1.fill(); }
+  f1.globalAlpha = 1; f1.globalCompositeOperation = 'source-over';
+  gc.save(); gc.globalAlpha = 0.92; gc.drawImage(F1, 0, 0); gc.restore();
+}
+// His whole body as a neon tube: the silhouette's rim glowing, a hot core, dark inside
+function neonBody(gc, p, fx, floor, fh, col, core) {
+  f2.clearRect(0, 0, PS, PS); flatFigure(f2, p, PAL.mono('#000'), fx, floor, fh, 'cap', false);
+  const tint = (c) => { f1.clearRect(0, 0, PS, PS); f1.drawImage(F2, 0, 0); f1.globalCompositeOperation = 'source-in'; f1.fillStyle = c; f1.fillRect(0, 0, PS, PS); f1.globalCompositeOperation = 'source-over'; };
+  const ring = (rr) => { for (let k = 0; k < 16; k++) { const a = k / 16 * TAU; gc.drawImage(F1, Math.cos(a) * rr, Math.sin(a) * rr); } };
+  gc.save(); tint(col); gc.shadowColor = col; gc.shadowBlur = 22; ring(5); gc.shadowBlur = 0; tint(core); ring(2.5); tint('#1a1220'); gc.drawImage(F1, 0, 0); gc.restore();
 }
 function pixels(gc, p, fx, floor, fh, cell, col, hat) {
   f1.clearRect(0, 0, PS, PS); flatFigure(f1, p, PAL.mono('#000'), fx, floor, fh, hat, false);
@@ -409,7 +425,7 @@ const LIST = B.panels.map((id, k) => ({ id, k, ...PANELS[id] }));
 for (const P_ of LIST) {
   P_.cache = mk(PS, PS); const gc = P_.cache.getContext('2d'); P_.bg(gc, rng(100 + P_.k)); if (P_.screenBg) P_.screenBg(gc);
   P_.thumb = mk(PS, PS); const tg = P_.thumb.getContext('2d'); tg.drawImage(P_.cache, 0, 0); if (P_.fg) P_.fg(tg, 1.3, 0);
-  drawFigureIn(tg, P_, MOVES[P_.move](0.3), P_.fx || PS / 2);
+  drawFigureIn(tg, P_, toSpark(MOVES[P_.move](0.3)), P_.fx || PS / 2);
 }
 function drawFigureIn(gc, P_, pose, fx) {
   gc.save(); if (P_.clip) { gc.beginPath(); gc.roundRect(P_.clip[0], P_.clip[1], P_.clip[2], P_.clip[3], 24); gc.clip(); }
@@ -474,19 +490,45 @@ function shoot(pose, t) {
   const kick = s.d < 0 ? 0 : Math.exp(-s.d * 14) * 0.45, right = s.i % 2 === 0;
   const aim = right ? { ra: [1.55 - kick, -0.05 - kick * 0.6] } : { la: [-1.55 + kick, 0.05 + kick * 0.6] };
   const target = { ...pose, ...aim, lean: pose.lean + (right ? -1 : 1) * 0.05 * kick, head: right ? 0.18 : -0.18, face: 1 };
+  if (w > 0.3) target[right ? 'hR' : 'hL'] = 'point';
   return { pose: blendPose(pose, target, w), shot: { right, k: s.d < 0 ? 0 : Math.max(0, 1 - s.d / 0.22), d: s.d } };
 }
+// The captured Mukkala routine (stories/prabhu-mocap.json): clip time t + offset = song time, so each clip plays
+// exactly where it happens in the song. Clip B's legs leave the frame after 4.5 s; from there only its upper
+// body is used and the legs come from the procedural dance.
+const SONG0 = (B.song && B.song.offset) || 0;
+const CLIPS = Object.entries(MC).filter(([, c]) => c && c.frames).map(([k, c]) => {
+  const [m, sec] = c.offset.split(':').map(Number), base = m * 60 + sec - SONG0;
+  return { k, c, t0: base + c.frames[0].t, t1: base + c.frames[c.frames.length - 1].t, base, legsUntil: k === 'B' ? base + 4.5 : Infinity };
+});
+function captured(t, proc) {
+  for (const C of CLIPS) {
+    if (t < C.t0 - 0.35 || t > C.t1 + 0.35) continue;
+    const f = sampleClip(C.c.frames, t - C.base);
+    let cap = { ...proc, tl: f.tl, st: f.st, pt: f.pt, ht: f.ht, hx: f.hx, aL: f.aL, aR: f.aR, lL: f.lL, lR: f.lR, fL: f.fL, fR: f.fR, hs: 0, y: 0, sx: 1, inv: 0, hL: 'open', hR: 'open' };
+    if (t > C.legsUntil) { const u = clamp((t - C.legsUntil) / 0.4, 0, 1); const legs = blendSpark({ lL: f.lL, lR: f.lR, pt: f.pt }, { lL: proc.lL, lR: proc.lR, pt: proc.pt }, u); cap = { ...cap, ...legs, fL: proc.fL, fR: proc.fR }; }
+    const w = ease(clamp((t - (C.t0 - 0.35)) / 0.35, 0, 1)) * ease(clamp(((C.t1 + 0.35) - t) / 0.35, 0, 1));
+    return { sp: blendSpark(proc, cap, w), on: w > 0.5 };
+  }
+  return null;
+}
 function dancer(t) {
-  if (t < T0) { const sh = shoot(MOVES.groove(0), t); return { wx: panelX(0), pose: sh.pose, shot: sh.shot }; }
-  const gb = (t - T0) / BEAT, x = camU((t - T0) / TP) * PITCH, sh = shoot(poseAt(gb), t);
-  return { wx: x + Math.sin(gb * Math.PI / 6) * 14, pose: sh.pose, shot: sh.shot };
+  const gb = (t - T0) / BEAT, base = t < T0 ? MOVES.groove(0) : poseAt(gb), sh = shoot(base, t);
+  let sp = toSpark(sh.pose), shot = sh.shot;
+  const cap = captured(t, toSpark(base));
+  if (cap) { sp = cap.sp; if (shot && cap.on) shot = { ...shot, right: null }; }   // during the routine the shot lands on whichever hand is out
+  if (t < T0) return { wx: panelX(0), pose: sp, shot };
+  const x = camU((t - T0) / TP) * PITCH;
+  return { wx: x + Math.sin(gb * Math.PI / 6) * 14, pose: sp, shot };
 }
 // the BANG! at the fingertip, in panel-local px
 function bang(gc, P_, pose, fx, shot) {
   if (!shot || shot.k <= 0) return;
-  const fh = (P_.fh || 0.52) * PS, floor = (P_.floor || 0.86) * PS, J = joints(pose), py = floor - footDrop(J) * fh - pose.y * fh;
-  const arm = shot.right ? J.ra : J.la, hx = fx + arm[2][0] * fh * pose.sx, hy = py + arm[2][1] * fh;
-  const dx = (arm[2][0] - arm[1][0]) * pose.sx, dy = arm[2][1] - arm[1][1], dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
+  const fh = (P_.fh || 0.52) * PS, floor = (P_.floor || 0.86) * PS, Q = rigPoints(pose, fx, floor, fh);
+  let right = shot.right;
+  if (right === null) right = Math.abs(Q.wR[0] - Q.shR[0]) >= Math.abs(Q.wL[0] - Q.shL[0]);
+  const hx = right ? Q.wR[0] : Q.wL[0], hy = right ? Q.wR[1] : Q.wL[1], ex = right ? Q.eR : Q.eL;
+  const dx = hx - ex[0], dy = hy - ex[1], dl = Math.hypot(dx, dy) || 1, ux = dx / dl, uy = dy / dl;
   const cx = hx + ux * 40, cy = hy + uy * 40, R0 = 26 + 44 * (1 - shot.k), k = shot.k;
   gc.save(); gc.globalAlpha = Math.min(1, k * 1.6);
   gc.fillStyle = '#ffe14d'; gc.strokeStyle = '#1a1206'; gc.lineWidth = 4; gc.beginPath();
