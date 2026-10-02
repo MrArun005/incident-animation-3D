@@ -1,9 +1,35 @@
 {
-  "bpm": 120,
+  "bpm": 119.99,
   "intro": 5,
-  "panel": 3,
+  "panel": 4.00033,
   "outro": 7,
-  "duration": 72,
-  "panels": ["rock", "seal", "nataraja", "relief", "mughal", "tanjore", "warli", "madhubani", "puppet", "kalighat",
-             "silent", "poster", "tv", "cassette", "truck", "neon", "popart", "lcd", "lowpoly", "reel"]
+  "duration": 92.007,
+  "panels": [
+    "rock",
+    "seal",
+    "nataraja",
+    "relief",
+    "mughal",
+    "tanjore",
+    "warli",
+    "madhubani",
+    "puppet",
+    "kalighat",
+    "silent",
+    "poster",
+    "tv",
+    "cassette",
+    "truck",
+    "neon",
+    "popart",
+    "lcd",
+    "lowpoly",
+    "reel"
+  ],
+  "panelBeats": 8,
+  "song": {
+    "file": "prabhu-song.m4a",
+    "offset": 19.327,
+    "note": "song beat 0 at 0.325 s, 119.99 bpm; the first panel (video 5 s) lands on the downbeat at 24.327 s"
+  }
 }

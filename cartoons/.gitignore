@@ -8,3 +8,7 @@ out/*.mbtree
 assets/gameplay/
 out/*.frames/
 out/*.done
+# copyrighted song supplied for personal use: never commit
+web/prabhu-song.html
+out/prabhu-song.*
+out/*-song*.mp4

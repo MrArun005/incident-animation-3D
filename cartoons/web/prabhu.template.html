@@ -78,7 +78,7 @@ const aud = document.getElementById('aud'), seek = document.getElementById('seek
 const big = document.getElementById('big'), playBtn = document.getElementById('play'), icon = document.getElementById('playIcon'), stage = document.getElementById('stage');
 const PLAY = 'M7 4.5v15l12-7.5z', PAUSE = 'M6.5 4.5h4v15h-4zM13.5 4.5h4v15h-4z';
 const fmt = (s) => `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`;
-const ticks = document.getElementById('ticks');
+const ticks = document.getElementById("ticks"); seek.max = DURATION;
 B.panels.forEach((_, k) => { const i = document.createElement('i'); i.style.left = `${((B.intro + k * B.panel) / DURATION) * 100}%`; ticks.appendChild(i); });
 let playing = false, clockT = 2.8, clock0 = 0, lastPanel = -2;
 function show(t) {
