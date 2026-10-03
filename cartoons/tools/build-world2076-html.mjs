@@ -49,3 +49,14 @@ document.getElementById('bar').addEventListener('touchstart', (e) => e.currentTa
 </script></body></html>`;
 fs.writeFileSync(path.join(ROOT, 'web', 'world2076.html'), html);
 console.log(`wrote web/world2076.html (${(html.length / 1e6).toFixed(2)} MB)`);
+// the claude.ai artifact variant: the host supplies the document skeleton, so drop ours; one dark look, safe-area aware
+const art = html.replace(/^<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport"[^>]*>\n/, '')
+  .replace('<style>\n', '<style>\n:root{--bg:#000;--fg:#fff;--line:#ffffff66;--scrim:rgba(0,0,0,.6);color-scheme:dark}\n')
+  .replace('html,body{margin:0;height:100%;background:#000;color:#fff;', 'html,body{margin:0;height:100%;background:var(--bg);color:var(--fg);')
+  .replace('background:rgba(0,0,0,.6);cursor:pointer', 'background:var(--scrim);cursor:pointer')
+  .replace('padding:10px 16px;background:', 'padding:10px 16px calc(10px + env(safe-area-inset-bottom, 0px));background:')
+  .replace('border:1px solid #fff6;color:#fff;', 'border:1px solid var(--line);color:var(--fg);')
+  .replace('#bar button{', '#bar button:focus-visible{outline:2px solid var(--fg)}#bar button{')
+  .replace('</style></head><body>', '</style>').replace('</script></body></html>', '</script>');
+fs.writeFileSync(path.join(ROOT, 'web', 'world2076.artifact.html'), art);
+console.log('wrote web/world2076.artifact.html');
