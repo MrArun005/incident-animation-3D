@@ -427,9 +427,22 @@ for (const P_ of LIST) {
   P_.thumb = mk(PS, PS); const tg = P_.thumb.getContext('2d'); tg.drawImage(P_.cache, 0, 0); if (P_.fg) P_.fg(tg, 1.3, 0);
   drawFigureIn(tg, P_, toSpark(MOVES[P_.move](0.3)), P_.fx || PS / 2);
 }
-function drawFigureIn(gc, P_, pose, fx) {
+function drawFigureIn(gc, P_, pose, fx, floorPx, fhPx) {
   gc.save(); if (P_.clip) { gc.beginPath(); gc.roundRect(P_.clip[0], P_.clip[1], P_.clip[2], P_.clip[3], 24); gc.clip(); }
-  P_.fig(gc, pose, fx, (P_.floor || 0.86) * PS, (P_.fh || 0.52) * PS, P_.hat || 'none', P_.pal || PAL.hero); gc.restore();
+  P_.fig(gc, pose, fx, floorPx ?? (P_.floor || 0.86) * PS, fhPx ?? (P_.fh || 0.52) * PS, P_.hat || 'none', P_.pal || PAL.hero); gc.restore();
+}
+// One body, never two: away from a border he is drawn in the panel he stands in; within SPAN of a border both
+// panels draw him at one shared size, floor and offset (blended across the crossing), each only on its own side
+// of the border line, so the halves meet exactly and the style changes along the cut.
+const SPAN = 170;
+const geomOf = (P_) => ({ fh: (P_.fh || 0.52) * PS, floor: (P_.floor || 0.86) * PS, off: P_.fx ? P_.fx - PS / 2 : 0 });
+function dancerParts(wx) {
+  const kc = clamp(Math.round(wx / PITCH), 0, N - 1), xb = wx >= panelX(kc) ? panelX(kc) + PITCH / 2 : panelX(kc) - PITCH / 2, d = wx - xb;
+  const a = Math.round((xb - PITCH / 2) / PITCH), b = a + 1;
+  if (Math.abs(d) > SPAN || a < 0 || b > N - 1) { const G = geomOf(LIST[kc]); return [{ k: kc, ...G, lo: -Infinity, hi: Infinity }]; }
+  const u = ease(clamp((d + SPAN) / (2 * SPAN), 0, 1)), A = geomOf(LIST[a]), Bg = geomOf(LIST[b]);
+  const G = { fh: lerp(A.fh, Bg.fh, u), floor: lerp(A.floor, Bg.floor, u), off: lerp(A.off, Bg.off, u) };
+  return [{ k: a, ...G, lo: -Infinity, hi: xb }, { k: b, ...G, lo: xb, hi: Infinity }];
 }
 // the panels' drop shadow, blurred once (a per-frame shadowBlur is slow on phones)
 const SHADOW = mk(PS + 180, PS + 180); { const sg = SHADOW.getContext('2d'); sg.shadowColor = 'rgba(60,45,25,0.30)'; sg.shadowBlur = 34; sg.shadowOffsetX = 10000; sg.shadowOffsetY = 14; sg.fillStyle = '#000'; sg.fillRect(90 - 10000, 90, PS, PS); }
@@ -526,9 +539,9 @@ function dancer(t) {
   return { wx: x + Math.sin(gb * Math.PI / 6) * 14, pose: sp, shot };
 }
 // the BANG! at the fingertip, in panel-local px
-function bang(gc, P_, pose, fx, shot) {
+function bang(gc, P_, pose, fx, shot, floorPx, fhPx) {
   if (!shot || shot.k <= 0) return;
-  const fh = (P_.fh || 0.52) * PS, floor = (P_.floor || 0.86) * PS, Q = rigPoints(pose, fx, floor, fh);
+  const fh = fhPx ?? (P_.fh || 0.52) * PS, floor = floorPx ?? (P_.floor || 0.86) * PS, Q = rigPoints(pose, fx, floor, fh);
   let right = shot.right;
   if (right === null) right = Math.abs(Q.wR[0] - Q.shR[0]) >= Math.abs(Q.wL[0] - Q.shL[0]);
   const hx = right ? Q.wR[0] : Q.wL[0], hy = right ? Q.wR[1] : Q.wL[1], ex = right ? Q.eR : Q.eL;
@@ -558,7 +571,11 @@ function drawGallery(t, cam, dn, opts = {}) {
     if (P_.fg) P_.fg(g, t, t - (T0 + P_.k * TP));
     if (showThumb > 0) { g.globalAlpha = showThumb; g.drawImage(P_.thumb, 0, 0); g.globalAlpha = 1; }
     // the dancer, in this panel's style, wherever he overlaps it
-    if (dn && Math.abs(dn.wx - cx) < PS * 0.95) { const fxl = dn.wx - x0 + (P_.fx ? P_.fx - PS / 2 : 0); drawFigureIn(g, P_, dn.pose, fxl); bang(g, P_, dn.pose, fxl, dn.shot); }
+    const part = dn && dancerParts(dn.wx).find((q) => q.k === P_.k);
+    if (part) {
+      g.save(); const l = Math.max(0, part.lo - x0), r = Math.min(PS, part.hi - x0); g.beginPath(); g.rect(l, -PS, r - l, PS * 3); g.clip();
+      const fxl = dn.wx - x0 + part.off; drawFigureIn(g, P_, dn.pose, fxl, part.floor, part.fh); bang(g, P_, dn.pose, fxl, dn.shot, part.floor, part.fh); g.restore();
+    }
     g.restore();
     // label
     if (cam.s > 0.45) {
