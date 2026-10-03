@@ -479,13 +479,17 @@ function camera(t) {
 }
 // The shots in the song (B.hits, video seconds): on each one he fires a finger gun, the arm snapping out and
 // kicking up with the recoil, alternating hands; a BANG! flash at the fingertip and a jolt of the camera.
+// Hooks for whatever drives the dancer from outside (the MUQABLA game): HOOK.pose(t, beat) returns a pose (or null
+// for the choreography), HOOK.shotOk(i) says whether shot i fires, HOOK.capture(t) whether the captured routine may
+// play, HOOK.noOutro hides the closing title. All unset: the film plays as authored.
+const HOOK = { pose: null, shotOk: null, capture: null, noOutro: false };
 const HITS = B.hits || [];
 function shotAt(t) {
   let best = null; HITS.forEach((h, i) => { const d = t - h; if (d > -0.12 && d < 0.45 && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, i, h }; });
   return best;
 }
 function shoot(pose, t) {
-  const s = shotAt(t); if (!s) return { pose, shot: null };
+  const s = shotAt(t); if (!s || (HOOK.shotOk && !HOOK.shotOk(s.i, s))) return { pose, shot: null };
   const w = s.d < 0 ? ease(1 + s.d / 0.12) : 1 - ease(clamp((s.d - 0.18) / 0.27, 0, 1));   // in fast, hold, let go
   const kick = s.d < 0 ? 0 : Math.exp(-s.d * 14) * 0.45, right = s.i % 2 === 0;
   const aim = right ? { ra: [1.55 - kick, -0.05 - kick * 0.6] } : { la: [-1.55 + kick, 0.05 + kick * 0.6] };
@@ -513,9 +517,9 @@ function captured(t, proc) {
   return null;
 }
 function dancer(t) {
-  const gb = (t - T0) / BEAT, base = t < T0 ? MOVES.groove(0) : poseAt(gb), sh = shoot(base, t);
+  const gb = (t - T0) / BEAT, base = (HOOK.pose && HOOK.pose(t, gb)) || (t < T0 ? MOVES.groove(0) : poseAt(gb)), sh = shoot(base, t);
   let sp = toSpark(sh.pose), shot = sh.shot;
-  const cap = captured(t, toSpark(base));
+  const cap = !HOOK.capture || HOOK.capture(t) ? captured(t, toSpark(base)) : null;
   if (cap) { sp = cap.sp; if (shot && cap.on) shot = { ...shot, right: null }; }   // during the routine the shot lands on whichever hand is out
   if (t < T0) return { wx: panelX(0), pose: sp, shot };
   const x = camU((t - T0) / TP) * PITCH;
@@ -604,7 +608,7 @@ function frame(t) {
   if (dn.shot && dn.shot.d > 0) { const j = Math.exp(-dn.shot.d * 18) * 9; cam.x += Math.sin(t * 97) * j; g.translate(0, Math.cos(t * 83) * j * 0.6); }
   const outro = seg(t, TEND + 0.8, TEND + 3.0);
   drawGallery(t, cam, dn, { thumbs: (k) => (k === N - 1 ? 0 : outro) });
-  if (t > TEND + 3.6) {
+  if (t > TEND + 3.6 && !HOOK.noOutro) {
     const a = seg(t, TEND + 3.6, TEND + 4.8) * (1 - seg(t, DURATION - 1.0, DURATION - 0.2));
     title(a, 180, 92, 'the dance goes on', 'a cartoon tribute · twenty panels · one dancer');
   }
@@ -613,5 +617,7 @@ function frame(t) {
 
 window.DURATION = DURATION; window.FPS = FPS;
 window.renderFrame = (i) => frame(i / FPS);
-if (!new URLSearchParams(location.search).has('render')) { const t0 = performance.now(); const loop = () => { frame(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); }; loop(); }
+if (!new URLSearchParams(location.search).has('render') && !/story=prabhugame/.test(location.search)) { const t0 = performance.now(); const loop = () => { frame(((performance.now() - t0) / 1000) % DURATION); requestAnimationFrame(loop); }; loop(); }
 window.ready = true;
+// what the MUQABLA game (src/prabhugame.js) builds on
+export const SCENE = { frame, dancer, LIST, HOOK, HITS, CLIPS, T0, TEND, TP, BEAT, N, DURATION, W, H, g, PS };
