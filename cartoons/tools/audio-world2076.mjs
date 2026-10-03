@@ -1,7 +1,7 @@
 // Score for "The World in 2076" (src/world2076.js). Original synthesis, no samples.
-// A clock ticking once per year as the counter runs 2026 -> 2076 over a rising sweep; a boom and a wide D-major
-// pad for Earth from orbit with bell notes; a whoosh and sub drop for the dive; a 120 bpm pulse with a plucked
-// arpeggio through the city; a lift for the elevator; an airy pad in space; a last boom and chord for the title.
+// A clock ticking once per year as the counter runs 2026 -> 2076; a soft hit and a wide D-major pad with bells
+// for Earth; a whoosh through the clouds; air, rotor hum and a light pluck line in the sky; birds, voices and a
+// gentle 120 bpm groove on the street and in the pod; a swell for the city at golden hour; a chord for the title.
 //   node tools/audio-world2076.mjs -> out/cartoon-world2076.wav
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,7 @@ class BP { constructor(f = 1000, q = 1) { this.x1 = this.x2 = this.y1 = this.y2 
   run(x) { const y = this.b0 * x + this.b2 * this.x2 - this.a1 * this.y1 - this.a2 * this.y2; this.x2 = this.x1; this.x1 = x; this.y2 = this.y1; this.y1 = y; return y; } }
 const lpk = (fc) => 1 - Math.exp(-TAU * fc / SR);
 // same curve as the picture
-const yearAt = (t) => 2026 + Math.floor(50 * Math.pow(clamp(t / 2.8, 0, 1), 2.2) + 1e-6);
+const yearAt = (t) => 2026 + Math.floor(50 * Math.pow(clamp(t / 2.3, 0, 1), 2.2) + 1e-6);
 
 // ---- instruments ----------------------------------------------------------------------------------------------
 function tick(t0, k) {                                   // a clock tick that brightens as the years run
@@ -90,46 +90,67 @@ function clap(t0, g = 0.16) {
 }
 
 // ---- the cue ------------------------------------------------------------------------------------------------
-// 0-3: years tick by, a rising sweep and a climbing tone underneath
-let last = 2026; for (let i = 0; i < S(2.85); i += 32) { const t = i / SR, y = yearAt(t); if (y !== last) { tick(t, y - 2026); last = y; } }
+// cuts (src/world2076.js SHOTS): earth 2.6, sky 6.0, street 10.5, car 15.5, city 19.5, title 22.5
+function bird(t0, g = 0.03, pan = 0.5) {               // a two-note chirp
+  const r = rng(Math.round(t0 * 1000)), n = 2 + Math.floor(r() * 3), f0 = 2600 + r() * 1800;
+  for (let k = 0; k < n; k++) { const s = S(t0 + k * 0.09), len = S(0.06); let ph = 0;
+    for (let j = 0; j < len; j++) { const u = j / len; ph += TAU * (f0 * (1 + 0.25 * Math.sin(u * Math.PI) - 0.1 * k)) / SR;
+      put(s + j, ...pan2(Math.sin(ph) * Math.sin(u * Math.PI) * g, pan), 0.4); } }
+}
+function murmur(t0, t1, g = 0.03) {                     // distant voices: band-limited noise with a syllable-rate swell
+  const s = S(t0), n = S(t1 - t0), bl = new BP(500, 0.8), br = new BP(650, 0.8);
+  for (let j = 0; j < n; j++) { const u = j / SR, e = Math.min(1, u / 0.6, (t1 - t0 - u) / 0.4) * (0.6 + 0.4 * Math.sin(u * 7.3) * Math.sin(u * 3.1 + 1)) * g;
+    put(s + j, bl.run(n2()) * e, br.run(n2()) * e, 0.3); }
+}
+function hum(t0, t1, f, g = 0.02, pan = 0.5) {         // an electric rotor: a soft tone with blade flutter
+  const s = S(t0), n = S(t1 - t0); let ph = 0; const bp = new BP(f * 4, 3);
+  for (let j = 0; j < n; j++) { const u = j / SR; ph += TAU * f / SR; const e = Math.min(1, u / 0.5, (t1 - t0 - u) / 0.5) * g * (0.7 + 0.3 * Math.sin(TAU * 31 * u));
+    put(s + j, ...pan2((Math.sin(ph) * 0.6 + bp.run(n2()) * 0.8) * e, pan), 0.2); }
+}
+// 0-2.6: years tick by over a rising sweep
+let last = 2026; for (let i = 0; i < S(2.4); i += 32) { const t = i / SR, y = yearAt(t); if (y !== last) { tick(t, y - 2026); last = y; } }
 tick(0.05, 0);
-sweep(0.2, 3.0, 300, 7000, 0.22, 2.0, 2.6);
-tone(0.4, 2.6, 38, 62, 0.05, 0.5);
-sweep(2.2, 3.0, 9000, 2500, 0.08, 0.8, 3);             // a reverse-cymbal swell into the hit
-// 3: Earth. Boom, the pad (D maj9 -> B m9 -> G maj7#11), bells
-boom(3.0, 1.0);
-pad(3.0, 5.8, [38, 50, 54, 57, 61, 64], 0.05, 1300, 0.4);
-pad(5.8, 8.4, [35, 47, 50, 54, 57, 61], 0.05, 1500, 0.6);
+sweep(0.2, 2.6, 300, 7000, 0.2, 2.0, 2.6);
+tone(0.4, 2.2, 38, 62, 0.045, 0.5);
+sweep(1.9, 2.6, 9000, 2500, 0.07, 0.8, 3);
+// 2.6: Earth. A soft hit, a wide D-major pad, bells
+boom(2.6, 0.8);
+pad(2.6, 6.0, [38, 50, 54, 57, 61, 64], 0.05, 1300, 0.4, 1.2);
 const LYD = [62, 64, 66, 69, 71, 73, 74, 76, 78, 81];
-{ const r = rng(9); for (let t = 3.4; t < 8.2; t += 0.36 + r() * 0.4) bell(t, LYD[Math.floor(r() * LYD.length)] + 12, 0.035, 0.2 + r() * 0.6); }
-// 7.8-9: the dive. A whoosh, a fall in pitch, the flash, a sub drop
-sweep(7.6, 8.9, 250, 5000, 0.28, 1.5, 2.2);
-tone(8.0, 0.9, 74, 50, 0.03, 0.6);
-boom(8.95, 0.9, 90, 30, 2.2);
-sweep(8.95, 10.0, 6000, 400, 0.1, 1.0, 0.3);
-// 9-19: the city. 120 bpm; kick on the beat, hats off it, claps from 14; arpeggio through G maj7 / A / B m7 / G-A
-const BEAT = 0.5, CH = [[9.0, [55, 59, 62, 66, 69]], [11.5, [57, 61, 64, 69, 73]], [14.0, [59, 62, 66, 69, 74]], [16.5, [55, 59, 62, 66, 71]], [17.75, [57, 61, 64, 69, 76]]];
+{ const r = rng(9); for (let t = 2.9; t < 5.2; t += 0.38 + r() * 0.4) bell(t, LYD[Math.floor(r() * LYD.length)] + 12, 0.032, 0.2 + r() * 0.6); }
+// 5-6: the dive through the clouds
+sweep(5.0, 6.0, 250, 5000, 0.26, 1.5, 2.2);
+tone(5.3, 0.7, 74, 52, 0.025, 0.6);
+// 6-10.5: the sky. Air, rotor hum passing, a gentle pluck line over B minor -> G
+sweep(6.0, 7.0, 6000, 500, 0.1, 0.9, 0.3);
+pad(6.0, 8.3, [35, 47, 54, 57, 62, 66], 0.042, 1600, 0.5, 0.8);
+pad(8.3, 10.5, [31, 43, 55, 59, 62, 66], 0.042, 1700, 0.5, 0.6);
+hum(6.0, 10.4, 92, 0.03, 0.62);
+sweep(7.2, 8.6, 300, 1200, 0.05, 2.0, 1.0); sweep(8.6, 9.6, 1200, 300, 0.05, 2.0, 0.4);    // a taxi lane passing
+{ const pat = [0, 2, 1, 3]; for (let i = 0; 6.25 + i * 0.25 < 10.4; i++) { const t = 6.25 + i * 0.25, c = t < 8.3 ? [59, 62, 66, 69] : [55, 59, 62, 66];
+  pluck(t, c[pat[i % 4]] + 12, 0.028, i % 2 ? 0.35 : 0.65, 1600); } }
+// 10.5-19.5: on the ground. Birds, voices, a light groove (kick, hats, claps from the car shot), arpeggio
+murmur(10.5, 19.4, 0.035);
+{ const r = rng(21); for (let t = 10.7; t < 19.2; t += 0.35 + r() * 0.9) bird(t, 0.022 + r() * 0.015, 0.15 + r() * 0.7); }
+const BEAT = 0.5, CH = [[10.5, [55, 59, 62, 66, 69]], [13.0, [57, 61, 64, 69, 73]], [15.5, [59, 62, 66, 69, 74]], [17.5, [55, 59, 62, 66, 71]]];
 const chordAt = (t) => { let c = CH[0][1]; for (const [t0, n] of CH) if (t >= t0) c = n; return c; };
-for (let b = 0; b < 20; b++) { const t = 9.0 + b * BEAT; if (t >= 18.9) break;
-  kick(t, b === 0 ? 0.6 : 0.45); hat(t + BEAT / 2, 0.07, 0.65);
-  if (t >= 14 && b % 2 === 1) clap(t, 0.14); }
-for (let i = 0; i * 0.125 + 9.0 < 18.9; i++) { const t = 9.0 + i * 0.125, c = chordAt(t), pat = [0, 2, 1, 3, 2, 4, 3, 1];
-  const m = c[pat[i % 8]] + (i % 16 >= 8 ? 12 : 0), open = 900 + 3500 * clamp((t - 9) / 9.5, 0, 1);
-  pluck(t, m, 0.045, i % 2 ? 0.3 : 0.7, open); if (i % 4 === 0) hat(t, 0.025, 0.3); }
-for (const [i, [t0, n]] of CH.entries()) { const t1 = i + 1 < CH.length ? CH[i + 1][0] : 19.0;
-  pad(t0, t1, [n[0] - 24, n[0] - 12, ...n.slice(1, 4)], 0.032, 900 + 400 * i, 0.3, 0.6); }
-// 18.3-19: the lift up the elevator
-sweep(18.0, 19.0, 400, 9000, 0.25, 2.2, 2.4);
-tone(18.2, 0.8, 50, 86, 0.03, 0.5);
-// 19-23: space. A soft hit, an airy pad, slow bells
-boom(19.0, 0.55, 70, 36, 2.5);
-pad(19.0, 23.2, [38, 50, 57, 61, 64, 69], 0.045, 1800, 1.0, 1.4);
-{ const r = rng(19); for (let t = 19.4; t < 22.9; t += 0.5 + r() * 0.5) bell(t, LYD[Math.floor(r() * LYD.length)] + (r() < 0.4 ? 12 : 0), 0.03, 0.2 + r() * 0.6); }
-sweep(22.2, 23.0, 600, 8000, 0.14, 1.2, 3);
-// 23-25: the title. Boom and the full chord, fading out
-boom(23.0, 1.0, 64, 30, 2.0);
-pad(23.0, 24.3, [26, 38, 50, 57, 62, 66, 69, 76], 0.04, 2200, 0.08, 0.7);
-bell(23.02, 74 + 12, 0.06, 0.5); bell(23.3, 81, 0.04, 0.35); bell(23.55, 78 + 12, 0.03, 0.65);
+for (let b = 0; ; b++) { const t = 10.5 + b * BEAT; if (t >= 19.3) break;
+  kick(t, t < 15.5 ? 0.32 : 0.45); hat(t + BEAT / 2, 0.06, 0.65);
+  if (t >= 15.5 && b % 2 === 1) clap(t, 0.12); }
+for (let i = 0; i * 0.125 + 10.5 < 19.3; i++) { const t = 10.5 + i * 0.125, c = chordAt(t), pat = [0, 2, 1, 3, 2, 4, 3, 1];
+  pluck(t, c[pat[i % 8]] + (i % 16 >= 8 ? 12 : 0), 0.038, i % 2 ? 0.3 : 0.7, 900 + 3000 * clamp((t - 10.5) / 9, 0, 1)); }
+for (const [i, [t0, n]] of CH.entries()) { const t1 = i + 1 < CH.length ? CH[i + 1][0] : 19.5;
+  pad(t0, t1, [n[0] - 24, n[0] - 12, ...n.slice(1, 4)], 0.03, 900 + 300 * i, 0.3, 0.6); }
+hum(15.5, 19.4, 70, 0.018, 0.4);                         // the pod's quiet motor
+// 19.5: the city at golden hour. A swell, then the title
+sweep(18.8, 19.5, 400, 8000, 0.18, 2.0, 2.4);
+boom(19.5, 0.6, 70, 36, 2.5);
+pad(19.5, 22.6, [38, 50, 57, 61, 64, 69], 0.045, 1800, 0.8, 1.2);
+{ const r = rng(19); for (let t = 19.8; t < 22.3; t += 0.5 + r() * 0.5) bell(t, LYD[Math.floor(r() * LYD.length)] + (r() < 0.4 ? 12 : 0), 0.028, 0.2 + r() * 0.6); }
+sweep(21.9, 22.6, 600, 8000, 0.12, 1.2, 3);
+boom(22.6, 1.0, 64, 30, 2.0);
+pad(22.6, 24.2, [26, 38, 50, 57, 62, 66, 69, 76], 0.04, 2200, 0.08, 0.8);
+bell(22.62, 86, 0.055, 0.5); bell(22.9, 81, 0.04, 0.35); bell(23.15, 90, 0.03, 0.65);
 
 // ---- reverb (Schroeder) and the mix ------------------------------------------------------------------------------
 function reverb(x, seed) {
