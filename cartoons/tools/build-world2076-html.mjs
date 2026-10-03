@@ -29,20 +29,32 @@ body:hover #bar,#bar.on{opacity:1}
 <canvas id="c" width="1920" height="1080"></canvas>
 <div id="go"><b>2076</b><span>TAP TO PLAY · SOUND ON</span></div>
 <div id="bar"><button id="pp">❚❚</button><input id="sk" type="range" min="0" max="25" step="0.01" value="0"><span id="t">0.0</span><button id="fs">⛶</button></div>
-<audio id="au" src="${uri('out/world2076-audio.mp3', 'audio/mpeg')}" preload="auto"></audio>
+<script>window.AUDIO_B64 = '${rd('out/world2076-audio.mp3').toString('base64')}';</script>
 <script>${rd('vendor/three-r147.js')}</script>
 <script type="module">
 ${tex}${scene}
-const au = document.getElementById('au'), go = document.getElementById('go'), pp = document.getElementById('pp'), sk = document.getElementById('sk'), tt = document.getElementById('t'), cv = document.getElementById('c');
+const go = document.getElementById('go'), pp = document.getElementById('pp'), sk = document.getElementById('sk'), tt = document.getElementById('t'), cv = document.getElementById('c');
 const fit = () => { const k = Math.min(innerWidth / 1920, innerHeight / 1080); cv.style.width = 1920 * k + 'px'; cv.style.height = 1080 * k + 'px'; }; addEventListener('resize', fit); fit();
-let drag = false;
-frame(0.4);
-const loop = () => { const t = Math.min(au.currentTime, DURATION - 0.001); if (!au.paused || drag) { frame(t); } if (!drag) sk.value = t; tt.textContent = t.toFixed(1) + ' / 25'; requestAnimationFrame(loop); }; loop();
-go.onclick = () => { go.style.display = 'none'; au.currentTime = 0; au.play(); };
-pp.onclick = () => { au.paused ? au.play() : au.pause(); };
-au.onplay = () => pp.textContent = '❚❚'; au.onpause = () => pp.textContent = '▶';
-au.onended = () => { go.style.display = 'flex'; go.querySelector('span').textContent = 'TAP TO REPLAY'; };
-sk.oninput = () => { drag = true; au.currentTime = +sk.value; frame(+sk.value); }; sk.onchange = () => { drag = false; };
+// The picture runs on its own clock; the score (Web Audio, decoded from inline bytes, so no media fetch is
+// needed) follows it. If audio cannot start, the film still plays silently.
+let ctx = null, buf = null, src = null, playing = false, base = 0, at = 0, drag = false;
+const now = () => (playing ? base + (performance.now() - at) / 1000 : base);
+async function initAudio() {
+  if (ctx) return; try { ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const bin = atob(window.AUDIO_B64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    buf = await ctx.decodeAudioData(u8.buffer); } catch (e) { console.warn('audio unavailable', e); }
+}
+function startAudio(t) { if (!ctx || !buf) return; try { stopAudio(); if (ctx.state === 'suspended') ctx.resume(); src = ctx.createBufferSource(); src.buffer = buf; src.connect(ctx.destination); src.start(0, Math.max(0, t)); } catch (e) {} }
+function stopAudio() { if (src) { try { src.stop(); } catch (e) {} src = null; } }
+function play(t = now()) { base = t; at = performance.now(); playing = true; startAudio(t); pp.textContent = '❚❚'; }
+function pause() { base = now(); playing = false; stopAudio(); pp.textContent = '▶'; }
+frame(1.6);
+const loop = () => { let t = now();
+  if (playing && t >= DURATION) { pause(); base = 0; t = 0; go.style.display = 'flex'; go.querySelector('span').textContent = 'TAP TO REPLAY'; }
+  if (playing || drag) frame(Math.min(t, DURATION - 0.001)); if (!drag) sk.value = t; tt.textContent = t.toFixed(1) + ' / 25'; requestAnimationFrame(loop); }; loop();
+go.onclick = async () => { go.style.display = 'none'; const c = initAudio(); if (ctx && ctx.state === 'suspended') ctx.resume(); play(0); await c; if (playing) startAudio(now()); };
+pp.onclick = () => (playing ? pause() : play());
+sk.oninput = () => { drag = true; base = +sk.value; at = performance.now(); frame(+sk.value); }; sk.onchange = () => { drag = false; if (playing) play(+sk.value); };
 document.getElementById('fs').onclick = () => (document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen());
 addEventListener('keydown', (e) => { if (e.code === 'Space') { e.preventDefault(); pp.onclick(); } });
 document.getElementById('bar').addEventListener('touchstart', (e) => e.currentTarget.classList.add('on'));

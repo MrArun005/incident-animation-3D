@@ -212,7 +212,7 @@ moon.material.uniforms.uBase.value.copy(V3(-2, 7, 42).sub(MOON_POS).normalize().
 // CITY: a floating coastal megacity at golden hour.
 // =============================================================================================================
 const city = new T.Group(); scene.add(city);
-const CSUN = V3(-0.55, 0.13, -0.82).normalize();
+const CSUN = V3(0.85, 0.17, -0.5).normalize();
 const SKY_GLSL = `
   vec3 skyCol(vec3 d, vec3 sunD){
     float y = d.y;
